@@ -45,6 +45,47 @@
         </div>
       </section>
 
+      <section class="live-scan" id="scan" aria-labelledby="scan-title">
+        <div class="scan-intro">
+          <p class="eyebrow">Live scanner / beta</p>
+          <h2 id="scan-title">Trace a public page.</h2>
+          <p>Enter a public URL. FocusPath opens it in an isolated browser and returns the keyboard route.</p>
+        </div>
+        <div class="scan-workspace">
+          <form class="scan-form" data-scan-form>
+            <label for="scan-url">Website URL</label>
+            <div class="scan-input-row">
+              <input id="scan-url" name="url" type="url" inputmode="url" autocomplete="url" placeholder="https://example.com" required aria-describedby="scan-terms" />
+              <button type="submit">Analyze <span>→</span></button>
+            </div>
+            <p id="scan-terms">Public HTTP(S) pages only. By continuing, you confirm you are authorized to test this page.</p>
+          </form>
+
+          <div class="scan-output" data-scan-output data-state="idle" aria-live="polite">
+            <div class="scan-output-head"><span>FocusPath browser</span><span data-scan-elapsed>Ready</span></div>
+            <div class="scan-idle" data-scan-idle>
+              <i></i>
+              <p>Waiting for a URL</p>
+            </div>
+            <div class="scan-progress" data-scan-progress hidden>
+              <div class="progress-line"><i></i></div>
+              <p data-scan-stage>Opening page…</p>
+              <small>Scanning one page · maximum 50 focus stops</small>
+            </div>
+            <div class="scan-error" data-scan-error hidden>
+              <span>Scan failed</span>
+              <p data-scan-error-copy></p>
+            </div>
+            <div class="scan-result" data-scan-result hidden>
+              <div class="result-title"><span data-result-status>Complete</span><h3 data-result-title></h3><p data-result-url></p></div>
+              <div class="result-metrics"><div><strong data-result-stops>0</strong><span>Stops</span></div><div><strong data-result-errors>0</strong><span>Errors</span></div><div><strong data-result-warnings>0</strong><span>Warnings</span></div></div>
+              <ul class="result-issues" data-result-issues></ul>
+              <div class="result-actions"><a data-open-report target="_blank" rel="noopener">Open report ↗</a><a data-download-report download="focuspath-report.html">Download HTML ↓</a></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="proof" id="demo" aria-labelledby="proof-title">
         <div class="proof-heading">
           <p class="eyebrow">One report. The complete route.</p>

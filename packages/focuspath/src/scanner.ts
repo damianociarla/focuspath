@@ -11,6 +11,17 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
 
   try {
     const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
+    if (options.isUrlAllowed) {
+      await page.route("**/*", async (route) => {
+        try {
+          const allowed = await options.isUrlAllowed?.(route.request().url());
+          if (allowed) await route.continue();
+          else await route.abort("blockedbyclient");
+        } catch {
+          await route.abort("blockedbyclient");
+        }
+      });
+    }
     await page.goto(url, {
       waitUntil: "domcontentloaded",
       timeout: options.timeoutMs ?? 30_000,

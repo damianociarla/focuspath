@@ -68,6 +68,31 @@ The monorepo contains:
 
 - `packages/focuspath`: scanner, report generator and CLI
 - `apps/web`: FocusPath landing page and interactive sample report
+- `apps/api`: protected live-scanner HTTP API
+- `infra/aws`: Docker/App Runner deployment and production migration notes
+
+## Live scanner
+
+Run the API beside the web app:
+
+```bash
+npm run build --workspace focuspath
+npm run dev:api
+npm run dev
+```
+
+The frontend uses `http://localhost:8787` during local development. In production, set `VITE_API_URL` while building the web app. See [infra/aws](infra/aws/README.md) for the AWS deployment.
+
+### HTTP API
+
+```http
+POST /v1/scans
+Content-Type: application/json
+
+{"url":"https://example.com"}
+```
+
+The response contains scan metadata, focus stops, findings, and a self-contained `reportHtml` document. `GET /health` reports API readiness. The beta API intentionally accepts only ports 80 and 443.
 
 ## Roadmap
 

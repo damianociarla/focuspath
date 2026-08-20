@@ -47,4 +47,6 @@ export interface ScanOptions {
   viewport?: { width: number; height: number };
   timeoutMs?: number;
   headless?: boolean;
+  /** Return false to block a main-frame or subresource URL before the browser requests it. */
+  isUrlAllowed?: (url: string) => boolean | Promise<boolean>;
 }

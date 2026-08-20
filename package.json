@@ -8,9 +8,10 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspace focuspath && npm run build --workspace @focuspath/web",
+    "build": "npm run build --workspace focuspath && npm run build --workspace @focuspath/api && npm run build --workspace @focuspath/web",
     "dev": "npm run dev --workspace @focuspath/web",
-    "test": "npm run test --workspace focuspath",
+    "dev:api": "npm run dev --workspace @focuspath/api",
+    "test": "npm test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "engines": {
