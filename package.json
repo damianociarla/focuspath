@@ -1,0 +1,22 @@
+{
+  "name": "focuspath-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace focuspath && npm run build --workspace @focuspath/web",
+    "dev": "npm run dev --workspace @focuspath/web",
+    "test": "npm run test --workspace focuspath",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "overrides": {
+    "esbuild": "^0.28.2"
+  }
+}

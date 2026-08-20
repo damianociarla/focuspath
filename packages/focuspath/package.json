@@ -1,0 +1,61 @@
+{
+  "name": "focuspath",
+  "version": "0.1.0",
+  "description": "See where keyboard navigation breaks. A visual accessibility scanner for focus order.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Damiano Ciarla",
+  "homepage": "https://github.com/damianociarla/focuspath#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/damianociarla/focuspath.git"
+  },
+  "bugs": {
+    "url": "https://github.com/damianociarla/focuspath/issues"
+  },
+  "keywords": [
+    "accessibility",
+    "a11y",
+    "focus",
+    "keyboard-navigation",
+    "playwright",
+    "testing"
+  ],
+  "bin": {
+    "focuspath": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts src/cli.ts --format esm --dts --clean",
+    "dev": "tsx src/cli.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "dependencies": {
+    "playwright": "^1.55.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

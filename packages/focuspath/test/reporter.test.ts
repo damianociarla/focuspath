@@ -1,0 +1,30 @@
+import { describe, expect, it } from "vitest";
+import { escapeHtml, generateHtmlReport } from "../src/reporter.js";
+import type { FocusReport } from "../src/types.js";
+
+describe("reporter", () => {
+  it("escapes untrusted page content", () => {
+    expect(escapeHtml(`<script>alert("x")</script>`)).toBe("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;");
+  });
+
+  it("renders focus nodes and issues", () => {
+    const report: FocusReport = {
+      version: 1,
+      url: "https://example.com/",
+      title: "Example",
+      scannedAt: "2026-08-20T00:00:00.000Z",
+      durationMs: 120,
+      viewport: { width: 1000, height: 700 },
+      document: { width: 1000, height: 1200 },
+      screenshot: "data:image/jpeg;base64,test",
+      stoppedBecause: "cycle",
+      steps: [{ index: 1, selector: "button", tagName: "button", role: "button", accessibleName: "", tabIndex: 0, href: null, rect: { x: 20, y: 30, width: 100, height: 40 }, focusIndicator: { outline: "2px solid black", boxShadow: "none" } }],
+      issues: [{ kind: "missing-name", severity: "error", step: 1, selector: "button", message: "Focusable control has no detectable accessible name." }],
+    };
+
+    const html = generateHtmlReport(report);
+    expect(html).toContain("FocusPath / Report");
+    expect(html).toContain("Focusable control has no detectable accessible name.");
+    expect(html).toContain("<circle cx=\"70\" cy=\"50\"");
+  });
+});
