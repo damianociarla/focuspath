@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FocusPath Live Scanner API
-  version: 0.3.3
+  version: 0.3.4
   description: Rate-limited public demo API; not a general-purpose scanning service.
 paths:
   /health:

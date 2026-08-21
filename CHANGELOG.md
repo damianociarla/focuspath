@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.4
+
+- Install Tab-cancellation instrumentation before page scripts execute.
+- Detect capture listeners that combine `preventDefault()` with `stopImmediatePropagation()`.
+
 ## 0.3.3
 
 - Report canceled Tab events as stalled focus instead of inferring a closed shadow root.

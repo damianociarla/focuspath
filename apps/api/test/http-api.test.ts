@@ -19,7 +19,7 @@ describe("HTTP API", () => {
     const response = await fetch(`${baseUrl}/health`);
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(await response.json()).toEqual({ status: "ok", version: "0.3.3", activeScans: 0 });
+    expect(await response.json()).toEqual({ status: "ok", version: "0.3.4", activeScans: 0 });
   });
 
   it("enforces JSON content type", async () => {
