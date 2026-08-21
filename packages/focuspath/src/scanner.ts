@@ -249,6 +249,7 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
       type: "jpeg",
       quality: 78,
     });
+    const capturedImage = jpegDimensions(screenshot) ?? { width: captureWidth, height: captureHeight };
 
     return {
       version: 2,
@@ -260,7 +261,11 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
       tabPressCount,
       limits: { maxSteps, maxTabPresses, maxOpaqueTabPresses },
       viewport,
-      document: { width: captureWidth, height: captureHeight },
+      // Chromium can return only the viewport when a page locks root scrolling
+      // (for example while a consent dialog is open), even when a taller clip
+      // was requested. Report the pixels that actually exist so the overlay
+      // can never extend into fabricated blank space.
+      document: capturedImage,
       steps,
       issues,
       screenshot: `data:image/jpeg;base64,${screenshot.toString("base64")}`,
@@ -277,6 +282,36 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
       new Promise<void>((resolve) => setTimeout(resolve, 1_000)),
     ]);
   }
+}
+
+function jpegDimensions(image: Buffer): { width: number; height: number } | null {
+  if (image.length < 4 || image[0] !== 0xff || image[1] !== 0xd8) return null;
+
+  let offset = 2;
+  while (offset + 8 < image.length) {
+    if (image[offset] !== 0xff) {
+      offset += 1;
+      continue;
+    }
+    while (image[offset] === 0xff) offset += 1;
+    const marker = image[offset++];
+    if (marker === undefined || marker === 0xd9 || marker === 0xda) break;
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd8)) continue;
+    if (offset + 1 >= image.length) break;
+
+    const segmentLength = image.readUInt16BE(offset);
+    if (segmentLength < 2 || offset + segmentLength > image.length) break;
+    const isStartOfFrame = marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker);
+    if (isStartOfFrame && segmentLength >= 7) {
+      return {
+        width: image.readUInt16BE(offset + 5),
+        height: image.readUInt16BE(offset + 3),
+      };
+    }
+    offset += segmentLength;
+  }
+
+  return null;
 }
 
 function remainingTime(startedAt: number, timeoutMs: number): number {

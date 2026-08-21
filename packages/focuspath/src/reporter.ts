@@ -5,11 +5,11 @@ export function generateHtmlReport(report: FocusReport): string {
   const warnings = report.issues.filter((issue) => issue.severity === "warning").length;
   const path = report.steps
     .map((step, index) => {
-      if (scrollContextsFor(step).length > 0) return "";
+      if (!isPlottable(step, report)) return "";
       const next = report.steps[index + 1];
       const x1 = step.rect.x + step.rect.width / 2;
       const y1 = step.rect.y + step.rect.height / 2;
-      const line = next && scrollContextsFor(next).length === 0
+      const line = next && isPlottable(next, report)
         ? `<line x1="${x1}" y1="${y1}" x2="${next.rect.x + next.rect.width / 2}" y2="${next.rect.y + next.rect.height / 2}" />`
         : "";
       return `${line}<g class="focus-node"><rect x="${step.rect.x}" y="${step.rect.y}" width="${Math.max(step.rect.width, 20)}" height="${Math.max(step.rect.height, 20)}" rx="4"/><circle cx="${x1}" cy="${y1}" r="13"/><text x="${x1}" y="${y1 + 4}">${step.index}</text></g>`;
@@ -25,12 +25,14 @@ export function generateHtmlReport(report: FocusReport): string {
     const scrollContexts = scrollContextsFor(step);
     const evidence = scrollContexts.length > 0
       ? `Sequence only — ${scrollContexts.map((context) => `${context.kind ?? "element"} ${context.selector} at scroll ${context.scrollLeft}, ${context.scrollTop}`).join("; ")}`
-      : "Plotted on final screenshot";
+      : isInsideScreenshot(step, report)
+        ? "Plotted on final screenshot"
+        : "Sequence only — outside the captured screenshot";
     return `<tr><th scope="row">${step.index}</th><td><code>${escapeHtml(step.selector)}</code></td><td>${escapeHtml(step.role ?? step.tagName)}</td><td>${escapeHtml(step.accessibleName || "—")}</td><td>${escapeHtml(styles)}</td><td>${escapeHtml(evidence)}</td></tr>`;
   }).join("");
-  const omittedOverlaySteps = report.steps.filter((step) => scrollContextsFor(step).length > 0).length;
+  const omittedOverlaySteps = report.steps.filter((step) => !isPlottable(step, report)).length;
   const visualNote = omittedOverlaySteps > 0
-    ? `<p class="visual-note"><strong>${omittedOverlaySteps} ${omittedOverlaySteps === 1 ? "step is" : "steps are"} sequence-only.</strong> Focus crossed independently scrolling or clipping contexts, so those steps are intentionally omitted from the final screenshot overlay. Every observed scroll state is recorded in the table.</p>`
+    ? `<p class="visual-note"><strong>${omittedOverlaySteps} ${omittedOverlaySteps === 1 ? "step is" : "steps are"} sequence-only.</strong> Those steps crossed independently scrolling or clipping contexts, or fall outside the pixels Chromium captured. They are intentionally omitted from the screenshot overlay and remain recorded in the table.</p>`
     : "";
   const reportTitle = escapeHtml(report.title || "Untitled page");
   const screenshot = escapeHtml(report.screenshot);
@@ -58,4 +60,14 @@ export function escapeHtml(value: string): string {
 function scrollContextsFor(step: FocusReport["steps"][number]) {
   if (step.scrollContexts && step.scrollContexts.length > 0) return step.scrollContexts;
   return step.scrollContext ? [step.scrollContext] : [];
+}
+
+function isPlottable(step: FocusReport["steps"][number], report: FocusReport): boolean {
+  return scrollContextsFor(step).length === 0 && isInsideScreenshot(step, report);
+}
+
+function isInsideScreenshot(step: FocusReport["steps"][number], report: FocusReport): boolean {
+  const centerX = step.rect.x + step.rect.width / 2;
+  const centerY = step.rect.y + step.rect.height / 2;
+  return centerX >= 0 && centerX <= report.document.width && centerY >= 0 && centerY <= report.document.height;
 }

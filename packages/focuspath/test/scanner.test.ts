@@ -86,6 +86,16 @@ describe("focus scanner", () => {
     expect(fixed?.rect).toMatchObject({ x: 14, y: 12 });
   });
 
+  it("reports the actual captured pixels when root scrolling is locked", async () => {
+    const report = await scanFocusPath(page(`<style>html,body{height:1600px;overflow:hidden}</style><button style="position:absolute;top:1400px">Deep control</button>`), {
+      focusSettleMs: 0,
+      viewport: { width: 800, height: 500 },
+    });
+
+    expect(report.document).toEqual({ width: 800, height: 500 });
+    expect(report.steps[0]?.rect.y).toBeGreaterThan(report.document.height);
+  });
+
   it("marks focus stops inside scroll containers as sequence-only evidence", async () => {
     const controls = Array.from({ length: 5 }, (_, index) => `<button style="display:block;height:70px">Control ${index + 1}</button>`).join("");
     const report = await scanFocusPath(page(`<div id="scroller" style="height:120px;overflow:auto">${controls}</div><a href="#after">After</a>`), {

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.3
+
+- Size screenshot evidence from the JPEG pixels Chromium actually captured when a page locks root scrolling.
+- Omit focus stops outside the captured image from the visual overlay while retaining them as sequence-only evidence.
+- Prevent focus-path lines and the report viewport from extending into fabricated blank space.
+
 ## 0.4.2
 
 - Follow scrolling and clipping contexts across same-origin iframe viewports and parent documents.
