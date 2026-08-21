@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FocusPath Live Scanner API
-  version: 0.3.0
+  version: 0.3.1
   description: Rate-limited public demo API; not a general-purpose scanning service.
 paths:
   /health:
@@ -30,7 +30,11 @@ paths:
               additionalProperties: false
               required: [url]
               properties:
-                url: { type: string, format: uri, maxLength: 2048 }
+                url:
+                  type: string
+                  maxLength: 2048
+                  description: Absolute HTTP(S) URL or hostname; omitted schemes default to HTTPS.
+                  examples: ["https://example.com", "example.com"]
       responses:
         "200":
           description: Scan completed
@@ -58,11 +62,9 @@ components:
         stoppedBecause: { $ref: "#/components/schemas/StopReason" }
         steps:
           type: array
-          maxItems: 50
           items: { $ref: "#/components/schemas/FocusStep" }
         issues:
           type: array
-          maxItems: 100
           items: { $ref: "#/components/schemas/FocusIssue" }
         reportHtml: { type: string }
     StopReason:
@@ -73,7 +75,7 @@ components:
       additionalProperties: false
       required: [index, selector, tagName, role, accessibleName, tabIndex, href, rect, focusIndicator]
       properties:
-        index: { type: integer, minimum: 1, maximum: 50 }
+        index: { type: integer, minimum: 1 }
         selector: { type: string }
         tagName: { type: string }
         role: { type: [string, "null"] }
@@ -105,9 +107,9 @@ components:
       properties:
         kind:
           type: string
-          enum: [missing-name, missing-or-generic-role, positive-tabindex, focus-stalled]
+          enum: [missing-name, missing-or-generic-role, positive-tabindex, focus-stalled, opaque-focus-host]
         severity: { type: string, enum: [error, warning] }
-        step: { type: integer, minimum: 1, maximum: 50 }
+        step: { type: integer, minimum: 1 }
         selector: { type: string }
         message: { type: string }
     Error:

@@ -4,6 +4,7 @@ import type { FocusIssue, FocusReport, FocusStep, ScanOptions } from "./types.js
 const DEFAULT_VIEWPORT = { width: 1440, height: 900 };
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_FOCUS_SETTLE_MS = 75;
+const MAX_OPAQUE_TABS_PER_HOST = 20;
 const NAMED_CONTROL_ROLES = new Set([
   "button", "checkbox", "combobox", "link", "listbox", "menuitem", "menuitemcheckbox", "menuitemradio",
   "option", "radio", "searchbox", "slider", "spinbutton", "switch", "tab", "textbox", "treeitem",
@@ -24,6 +25,8 @@ const DEEPEST_ACTIVE_ELEMENT_EXPRESSION = `(() => {
   }
   return element;
 })()`;
+
+type ObservedFocusStep = FocusStep & { opaqueHost: boolean };
 
 export class ScanTimeoutError extends Error {
   constructor(timeoutMs: number) {
@@ -105,39 +108,66 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
     const seen = new Map<string, number>();
     let stoppedBecause: FocusReport["stoppedBecause"] = "step-limit";
     let previousSelector = "";
+    let previousWasOpaque = false;
+    let opaqueTabCount = 0;
 
-    for (let index = 1; index <= maxSteps; index += 1) {
+    while (steps.length < maxSteps) {
       await page.keyboard.press("Tab");
       await settleFocus(page, focusSettleMs);
       if (timedOut) throw new ScanTimeoutError(timeoutMs);
-      const step = await readActiveElement(page, cdp, index);
+      const observed = await readActiveElement(page, cdp, steps.length + 1);
 
-      if (!step) {
+      if (!observed) {
         stoppedBecause = steps.length === 0 ? "no-focusable-elements" : "document-exhausted";
         break;
       }
 
-      if (step.selector === previousSelector) {
+      if (observed.selector === previousSelector && previousWasOpaque && observed.opaqueHost) {
+        opaqueTabCount += 1;
+        if (opaqueTabCount < MAX_OPAQUE_TABS_PER_HOST) continue;
         issues.push({
           kind: "focus-stalled",
           severity: "warning",
-          step: index,
-          selector: step.selector,
+          step: observed.index,
+          selector: observed.selector,
+          message: `Focus did not leave the opaque host after ${MAX_OPAQUE_TABS_PER_HOST} additional Tab presses.`,
+        });
+        stoppedBecause = "stalled-on-element";
+        break;
+      }
+
+      if (observed.selector === previousSelector) {
+        issues.push({
+          kind: "focus-stalled",
+          severity: "warning",
+          step: observed.index,
+          selector: observed.selector,
           message: "Focus did not move after pressing Tab.",
         });
         stoppedBecause = "stalled-on-element";
         break;
       }
 
-      if (seen.has(step.selector)) {
+      if (seen.has(observed.selector)) {
         stoppedBecause = "cycle-complete";
         break;
       }
 
-      seen.set(step.selector, index);
+      const { opaqueHost, ...step } = observed;
+      seen.set(step.selector, step.index);
       previousSelector = step.selector;
+      previousWasOpaque = opaqueHost;
+      opaqueTabCount = 0;
       steps.push(step);
-      issues.push(...issuesFor(step));
+      if (opaqueHost) {
+        issues.push({
+          kind: "opaque-focus-host",
+          severity: "warning",
+          step: step.index,
+          selector: step.selector,
+          message: "Focus entered a cross-origin frame or closed shadow root whose internal controls cannot be inspected.",
+        });
+      } else issues.push(...issuesFor(step));
     }
 
     await page.evaluate(() => window.scrollTo(0, 0));
@@ -191,7 +221,27 @@ async function settleFocus(page: Page, delayMs: number): Promise<void> {
     let stableFrames = 0;
     let sampledFrames = 0;
     const sample = () => {
-      const element = document.activeElement;
+      let element = document.activeElement;
+      while (element?.nodeType === Node.ELEMENT_NODE) {
+        const current = element as HTMLElement;
+        const shadowActive = current.shadowRoot?.activeElement;
+        if (shadowActive?.nodeType === Node.ELEMENT_NODE) {
+          element = shadowActive;
+          continue;
+        }
+        if (current.tagName === "IFRAME") {
+          try {
+            const frameActive = (current as HTMLIFrameElement).contentDocument?.activeElement;
+            if (frameActive?.nodeType === Node.ELEMENT_NODE && frameActive !== (current as HTMLIFrameElement).contentDocument?.body) {
+              element = frameActive;
+              continue;
+            }
+          } catch {
+            // Cross-origin frame contents are intentionally opaque.
+          }
+        }
+        break;
+      }
       const rect = element instanceof HTMLElement ? element.getBoundingClientRect() : null;
       const current = rect ? [rect.x, rect.y, rect.width, rect.height].map((value) => value.toFixed(2)).join(":") : "none";
       stableFrames = current === previous ? stableFrames + 1 : 0;
@@ -241,7 +291,7 @@ function issuesFor(step: FocusStep): FocusIssue[] {
   return issues;
 }
 
-async function readActiveElement(page: Page, cdp: CDPSession, index: number): Promise<FocusStep | null> {
+async function readActiveElement(page: Page, cdp: CDPSession, index: number): Promise<ObservedFocusStep | null> {
   let accessibleName = "";
   let computedRole = "";
   try {
@@ -257,6 +307,7 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
 
   return page.evaluate(({ stepIndex, computedName, accessibilityRole }) => {
     let element = document.activeElement;
+    let opaqueHost = false;
     while (element?.nodeType === Node.ELEMENT_NODE) {
       const current = element as HTMLElement;
       const shadowActive = current.shadowRoot?.activeElement;
@@ -275,6 +326,11 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
         } catch {
           // Cross-origin frame contents are intentionally opaque.
         }
+        opaqueHost = true;
+      } else if (current.tagName.includes("-") && current.shadowRoot === null) {
+        // A focused custom-element host without an open root may represent focus
+        // delegated into a closed shadow tree. Repeated observations are opaque.
+        opaqueHost = true;
       }
       break;
     }
@@ -312,6 +368,7 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
         outline: `${styles.outlineWidth} ${styles.outlineStyle} ${styles.outlineColor}`,
         boxShadow: styles.boxShadow,
       },
+      opaqueHost,
     };
 
     function absoluteRect(node: HTMLElement): { x: number; y: number; width: number; height: number } {

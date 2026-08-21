@@ -20,7 +20,7 @@ npx focuspath https://example.com
 
 ## Scope and limitations
 
-FocusPath is an early diagnostic tool, not a WCAG conformance test. It currently runs Chromium and follows forward `Tab` navigation in the main document. Dynamic interfaces, cross-origin iframes, closed shadow roots, platform-specific widgets, reverse navigation, and focus appearance still require manual and cross-browser testing. Outline and box-shadow values are evidence for a reviewer; FocusPath does not automatically certify WCAG focus appearance.
+FocusPath is an early diagnostic tool, not a WCAG conformance test. It currently runs Chromium and follows forward `Tab` navigation. Cross-origin iframes and closed shadow roots are represented as opaque focus hosts so traversal can continue, but their internal controls cannot be inspected. Dynamic interfaces, platform-specific widgets, reverse navigation, and focus appearance still require manual and cross-browser testing. Outline and box-shadow values are evidence for a reviewer; FocusPath does not automatically certify WCAG focus appearance.
 
 ## Usage
 
