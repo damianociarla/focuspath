@@ -26,5 +26,9 @@ describe("reporter", () => {
     expect(html).toContain("FocusPath / Report");
     expect(html).toContain("Focusable control has no detectable accessible name.");
     expect(html).toContain("<circle cx=\"70\" cy=\"50\"");
+    expect(html).toContain("Skip visual overview");
+    expect(html).toContain("<caption class=\"sr-only\">Focus stops in keyboard traversal order</caption>");
+    expect(html).toContain("<th scope=\"row\">1</th>");
+    expect(html).toContain("aria-hidden=\"true\" focusable=\"false\"");
   });
 });

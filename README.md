@@ -54,7 +54,7 @@ const html = generateHtmlReport(result);
 
 ## Development
 
-Requirements: Node.js 20+.
+Requirements: Node.js 24+.
 
 ```bash
 npm install

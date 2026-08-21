@@ -15,7 +15,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "overrides": {
     "esbuild": "^0.28.2"

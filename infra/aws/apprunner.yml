@@ -8,6 +8,27 @@ Parameters:
   AllowedOrigin:
     Type: String
     Default: https://damianociarla.github.io
+  OriginVerifyToken:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+    Description: Secret header shared by CloudFront and App Runner
+  BudgetAlertEmail:
+    Type: String
+    Default: ""
+    Description: Optional email address for monthly cost alerts
+  MonthlyBudgetUsd:
+    Type: Number
+    Default: 20
+    MinValue: 1
+  WebAclArn:
+    Type: String
+    Default: ""
+    Description: Optional global WAFv2 web ACL ARN for the CloudFront distribution
+
+Conditions:
+  HasBudgetAlertEmail: !Not [!Equals [!Ref BudgetAlertEmail, ""]]
+  HasWebAcl: !Not [!Equals [!Ref WebAclArn, ""]]
 
 Resources:
   AppRunnerEcrAccessRole:
@@ -23,10 +44,19 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess
 
+  ApiAutoScaling:
+    Type: AWS::AppRunner::AutoScalingConfiguration
+    Properties:
+      AutoScalingConfigurationName: focuspath-cost-cap
+      MaxConcurrency: 10
+      MaxSize: 1
+      MinSize: 1
+
   ApiService:
     Type: AWS::AppRunner::Service
     Properties:
       ServiceName: focuspath-api
+      AutoScalingConfigurationArn: !GetAtt ApiAutoScaling.AutoScalingConfigurationArn
       SourceConfiguration:
         AutoDeploymentsEnabled: false
         AuthenticationConfiguration:
@@ -39,14 +69,20 @@ Resources:
             RuntimeEnvironmentVariables:
               - Name: ALLOWED_ORIGINS
                 Value: !Ref AllowedOrigin
+              - Name: ORIGIN_VERIFY_TOKEN
+                Value: !Ref OriginVerifyToken
               - Name: MAX_CONCURRENT_SCANS
-                Value: "2"
+                Value: "1"
               - Name: MAX_FOCUS_STEPS
                 Value: "50"
               - Name: SCAN_TIMEOUT_MS
                 Value: "25000"
               - Name: RATE_LIMIT_PER_10_MINUTES
                 Value: "4"
+              - Name: GLOBAL_RATE_LIMIT_PER_HOUR
+                Value: "60"
+              - Name: TARGET_RATE_LIMIT_PER_HOUR
+                Value: "2"
       InstanceConfiguration:
         Cpu: "1 vCPU"
         Memory: "2 GB"
@@ -58,10 +94,102 @@ Resources:
         HealthyThreshold: 1
         UnhealthyThreshold: 5
 
+  ApiDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: Protected public entry point for the FocusPath API
+        Enabled: true
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: PriceClass_100
+        WebACLId: !If [HasWebAcl, !Ref WebAclArn, !Ref AWS::NoValue]
+        Origins:
+          - Id: AppRunnerOrigin
+            DomainName: !GetAtt ApiService.ServiceUrl
+            OriginCustomHeaders:
+              - HeaderName: X-FocusPath-Origin-Verify
+                HeaderValue: !Ref OriginVerifyToken
+            CustomOriginConfig:
+              HTTPSPort: 443
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols:
+                - TLSv1.2
+        DefaultCacheBehavior:
+          TargetOriginId: AppRunnerOrigin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - DELETE
+            - GET
+            - HEAD
+            - OPTIONS
+            - PATCH
+            - POST
+            - PUT
+          CachedMethods:
+            - GET
+            - HEAD
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+          OriginRequestPolicyId: !Ref ApiOriginRequestPolicy
+
+  ApiOriginRequestPolicy:
+    Type: AWS::CloudFront::OriginRequestPolicy
+    Properties:
+      OriginRequestPolicyConfig:
+        Name: focuspath-api-origin-headers
+        Comment: Forward only the headers required by the public scanner API
+        CookiesConfig:
+          CookieBehavior: none
+        QueryStringsConfig:
+          QueryStringBehavior: none
+        HeadersConfig:
+          HeaderBehavior: whitelist
+          Headers:
+            - Access-Control-Request-Headers
+            - Access-Control-Request-Method
+            - CloudFront-Viewer-Address
+            - Content-Type
+            - Origin
+
+  MonthlyCostBudget:
+    Type: AWS::Budgets::Budget
+    Condition: HasBudgetAlertEmail
+    Properties:
+      Budget:
+        BudgetName: focuspath-monthly-cost
+        BudgetLimit:
+          Amount: !Ref MonthlyBudgetUsd
+          Unit: USD
+        BudgetType: COST
+        TimeUnit: MONTHLY
+      NotificationsWithSubscribers:
+        - Notification:
+            ComparisonOperator: GREATER_THAN
+            NotificationType: FORECASTED
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - Address: !Ref BudgetAlertEmail
+              SubscriptionType: EMAIL
+        - Notification:
+            ComparisonOperator: GREATER_THAN
+            NotificationType: ACTUAL
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - Address: !Ref BudgetAlertEmail
+              SubscriptionType: EMAIL
+
 Outputs:
   ServiceUrl:
-    Description: HTTPS URL of the FocusPath API
+    Description: Direct App Runner URL; scan requests require the private origin header
     Value: !Sub "https://${ApiService.ServiceUrl}"
   ServiceArn:
     Description: ARN used to associate AWS WAF later
     Value: !GetAtt ApiService.ServiceArn
+  ProtectedApiUrl:
+    Description: Public API URL to configure in GitHub Pages
+    Value: !Sub "https://${ApiDistribution.DomainName}"
+  DistributionId:
+    Description: CloudFront distribution to enroll in the Free flat-rate plan
+    Value: !Ref ApiDistribution

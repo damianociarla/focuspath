@@ -47,6 +47,12 @@ export interface ScanOptions {
   viewport?: { width: number; height: number };
   timeoutMs?: number;
   headless?: boolean;
+  /** Maximum number of network requests made by the page. */
+  maxRequests?: number;
+  /** Browser resource types to block before they are downloaded. */
+  blockedResourceTypes?: string[];
+  /** Maximum document height captured in the embedded screenshot. */
+  maxScreenshotHeight?: number;
   /** Return false to block a main-frame or subresource URL before the browser requests it. */
   isUrlAllowed?: (url: string) => boolean | Promise<boolean>;
 }

@@ -7,15 +7,24 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
   const startedAt = Date.now();
   const maxSteps = options.maxSteps ?? 50;
   const viewport = options.viewport ?? DEFAULT_VIEWPORT;
+  const maxRequests = options.maxRequests ?? Number.POSITIVE_INFINITY;
+  const blockedResourceTypes = new Set(options.blockedResourceTypes ?? []);
+  const maxScreenshotHeight = options.maxScreenshotHeight ?? Number.POSITIVE_INFINITY;
   const browser = await chromium.launch({ headless: options.headless ?? true });
 
   try {
     const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
-    if (options.isUrlAllowed) {
+    let requestCount = 0;
+    if (options.isUrlAllowed || Number.isFinite(maxRequests) || blockedResourceTypes.size > 0) {
       await page.route("**/*", async (route) => {
         try {
+          requestCount += 1;
+          if (requestCount > maxRequests || blockedResourceTypes.has(route.request().resourceType())) {
+            await route.abort("blockedbyclient");
+            return;
+          }
           const allowed = await options.isUrlAllowed?.(route.request().url());
-          if (allowed) await route.continue();
+          if (allowed ?? true) await route.continue();
           else await route.abort("blockedbyclient");
         } catch {
           await route.abort("blockedbyclient");
@@ -72,14 +81,18 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
     }
 
     await page.evaluate(() => window.scrollTo(0, 0));
-    const [metadata, screenshot] = await Promise.all([
-      page.evaluate(() => ({
+    const metadata = await page.evaluate(() => ({
         title: document.title,
         width: Math.max(document.documentElement.scrollWidth, document.body?.scrollWidth ?? 0),
         height: Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight ?? 0),
-      })),
-      page.screenshot({ fullPage: true, type: "jpeg", quality: 78 }),
-    ]);
+      }));
+    const captureWidth = Math.max(1, Math.min(metadata.width, viewport.width));
+    const captureHeight = Math.max(1, Math.min(metadata.height, maxScreenshotHeight));
+    const screenshot = await page.screenshot({
+      clip: { x: 0, y: 0, width: captureWidth, height: captureHeight },
+      type: "jpeg",
+      quality: 78,
+    });
 
     return {
       version: 1,
@@ -88,7 +101,7 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
       scannedAt: new Date().toISOString(),
       durationMs: Date.now() - startedAt,
       viewport,
-      document: { width: metadata.width, height: metadata.height },
+      document: { width: captureWidth, height: captureHeight },
       steps,
       issues,
       screenshot: `data:image/jpeg;base64,${screenshot.toString("base64")}`,

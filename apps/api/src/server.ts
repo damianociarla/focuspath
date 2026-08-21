@@ -1,15 +1,21 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { generateHtmlReport, scanFocusPath } from "focuspath";
 import { assertPublicUrl, createPublicUrlPolicy, UnsafeUrlError } from "./network-policy.js";
+import { clientAddress, hasValidOriginToken, SlidingWindowLimiter } from "./security.js";
 
 const port = Number(process.env.PORT ?? 8787);
 const maxConcurrentScans = Number(process.env.MAX_CONCURRENT_SCANS ?? 2);
 const maxSteps = Number(process.env.MAX_FOCUS_STEPS ?? 50);
 const scanTimeoutMs = Number(process.env.SCAN_TIMEOUT_MS ?? 25_000);
+const originVerifyToken = process.env.ORIGIN_VERIFY_TOKEN ?? "";
 const allowedOrigins = new Set((process.env.ALLOWED_ORIGINS ?? "http://localhost:5173,http://127.0.0.1:5173,https://damianociarla.github.io").split(",").map((origin) => origin.trim()).filter(Boolean));
 const rateWindowMs = 10 * 60_000;
 const rateMax = Number(process.env.RATE_LIMIT_PER_10_MINUTES ?? 4);
-const rateBuckets = new Map<string, number[]>();
+const globalRateMax = Number(process.env.GLOBAL_RATE_LIMIT_PER_HOUR ?? 60);
+const targetRateMax = Number(process.env.TARGET_RATE_LIMIT_PER_HOUR ?? 2);
+const clientLimiter = new SlidingWindowLimiter(rateMax, rateWindowMs);
+const globalLimiter = new SlidingWindowLimiter(globalRateMax, 60 * 60_000, 1);
+const targetLimiter = new SlidingWindowLimiter(targetRateMax, 60 * 60_000);
 let activeScans = 0;
 
 const server = createServer(async (request, response) => {
@@ -36,13 +42,24 @@ const server = createServer(async (request, response) => {
     return;
   }
 
+  if (!hasValidOriginToken(originVerifyToken, request.headers["x-focuspath-origin-verify"])) {
+    json(response, 404, { error: "Not found" });
+    return;
+  }
+
   if (origin && !allowedOrigins.has(origin)) {
     json(response, 403, { error: "Origin not allowed" });
     return;
   }
 
+
+  if (!request.headers["content-type"]?.toLowerCase().startsWith("application/json")) {
+    json(response, 415, { error: "Content-Type must be application/json." });
+    return;
+  }
+
   const client = clientAddress(request);
-  if (!consumeRateLimit(client)) {
+  if (!clientLimiter.consume(client)) {
     response.setHeader("retry-after", "600");
     json(response, 429, { error: "Scan limit reached. Try again in a few minutes." });
     return;
@@ -59,6 +76,19 @@ const server = createServer(async (request, response) => {
     const body = await readJsonBody(request);
     const submitted = typeof body.url === "string" ? body.url.trim() : "";
     const url = await assertPublicUrl(submitted);
+
+    if (!globalLimiter.consume("all")) {
+      response.setHeader("retry-after", "3600");
+      json(response, 429, { error: "The public demo has reached its hourly capacity. Try again later." });
+      return;
+    }
+
+    if (!targetLimiter.consume(url.hostname)) {
+      response.setHeader("retry-after", "3600");
+      json(response, 429, { error: "This hostname was already scanned recently. Try again later." });
+      return;
+    }
+
     activeScans += 1;
     acquiredScanSlot = true;
 
@@ -68,6 +98,9 @@ const server = createServer(async (request, response) => {
       timeoutMs: scanTimeoutMs,
       viewport: { width: 1280, height: 800 },
       isUrlAllowed: createPublicUrlPolicy(),
+      maxRequests: 120,
+      blockedResourceTypes: ["font", "media"],
+      maxScreenshotHeight: 5_000,
     });
 
     json(response, 200, {
@@ -115,19 +148,4 @@ async function readJsonBody(request: IncomingMessage): Promise<Record<string, un
     chunks.push(buffer);
   }
   return JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
-}
-
-function clientAddress(request: IncomingMessage): string {
-  const forwarded = request.headers["x-forwarded-for"];
-  return (Array.isArray(forwarded) ? forwarded[0] : forwarded?.split(",")[0])?.trim() || request.socket.remoteAddress || "unknown";
-}
-
-function consumeRateLimit(client: string): boolean {
-  const now = Date.now();
-  const recent = (rateBuckets.get(client) ?? []).filter((timestamp) => now - timestamp < rateWindowMs);
-  if (recent.length >= rateMax) return false;
-  recent.push(now);
-  rateBuckets.set(client, recent);
-  if (rateBuckets.size > 10_000) rateBuckets.clear();
-  return true;
 }
