@@ -103,6 +103,14 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
     await page.evaluate(() => {
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
       window.scrollTo(0, 0);
+      const state = window as Window & { __focusPathTabCanceled?: boolean };
+      state.__focusPathTabCanceled = false;
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Tab") return;
+        setTimeout(() => {
+          state.__focusPathTabCanceled = event.defaultPrevented;
+        }, 0);
+      }, { capture: true });
     });
 
     const steps: FocusStep[] = [];
@@ -116,10 +124,16 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
     let tabPressCount = 0;
 
     while (steps.length < maxSteps && tabPressCount < maxTabPresses) {
+      await page.evaluate(() => {
+        (window as Window & { __focusPathTabCanceled?: boolean }).__focusPathTabCanceled = false;
+      });
       await page.keyboard.press("Tab");
       tabPressCount += 1;
       await settleFocus(page, focusSettleMs);
       if (timedOut) throw new ScanTimeoutError(timeoutMs);
+      const tabWasCanceled = await page.evaluate(() => (
+        (window as Window & { __focusPathTabCanceled?: boolean }).__focusPathTabCanceled === true
+      ));
       const observed = await readActiveElement(page, cdp, steps.length + 1);
 
       if (!observed) {
@@ -128,6 +142,18 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
       }
 
       const repeatedSelector = observed.selector === previousSelector;
+      if (repeatedSelector && tabWasCanceled) {
+        const existingStep = seen.get(observed.selector) ?? Math.max(1, steps.length);
+        issues.push({
+          kind: "focus-stalled",
+          severity: "warning",
+          step: existingStep,
+          selector: observed.selector,
+          message: "Focus did not move because the page canceled the Tab key event.",
+        });
+        stoppedBecause = "stalled-on-element";
+        break;
+      }
       const repeatedOpaqueHost = repeatedSelector && (
         previousWasConfirmedOpaque
         || observed.confirmedOpaqueHost
@@ -143,7 +169,7 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
             severity: "warning",
             step: hostStep,
             selector: observed.selector,
-            message: "Repeated focus indicates a closed shadow root whose internal controls cannot be inspected.",
+            message: "Repeated uncanceled Tab movement is consistent with a closed shadow root whose internal controls cannot be inspected.",
           });
         }
         opaqueTabCount += 1;

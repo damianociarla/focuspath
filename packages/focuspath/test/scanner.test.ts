@@ -93,8 +93,7 @@ describe("focus scanner", () => {
     const report = await scanFocusPath(page(`<secret-control></secret-control><script>
       const host = document.querySelector('secret-control');
       const root = host.attachShadow({mode:'closed'});
-      root.innerHTML = '<button>Private action</button>';
-      host.addEventListener('keydown', event => { if (event.key === 'Tab') event.preventDefault(); });
+      root.innerHTML = '<button>Private one</button><button>Private two</button><button>Private three</button><button>Private four</button><button>Private five</button>';
     </script>`), { focusSettleMs: 0, maxOpaqueTabPresses: 3 });
     expect(report.steps).toHaveLength(1);
     expect(report.issues).toContainEqual(expect.objectContaining({ kind: "opaque-focus-host" }));
@@ -109,6 +108,21 @@ describe("focus scanner", () => {
     expect(report.issues).toContainEqual(expect.objectContaining({ kind: "positive-tabindex", selector: "body > user-chip" }));
     expect(report.issues).toContainEqual(expect.objectContaining({ kind: "missing-or-generic-role", selector: "body > user-chip" }));
     expect(report.issues).not.toContainEqual(expect.objectContaining({ kind: "opaque-focus-host" }));
+  });
+
+  it("reports a custom element that cancels Tab as stalled focus", async () => {
+    const report = await scanFocusPath(page(`<user-chip tabindex="0">Profile</user-chip><button>After</button><script>
+      document.querySelector('user-chip').addEventListener('keydown', event => {
+        if (event.key === 'Tab') event.preventDefault();
+      });
+    </script>`), { focusSettleMs: 0, maxOpaqueTabPresses: 3 });
+    expect(report.steps).toHaveLength(1);
+    expect(report.issues).toContainEqual(expect.objectContaining({ kind: "missing-or-generic-role", step: 1 }));
+    expect(report.issues).toContainEqual(expect.objectContaining({ kind: "focus-stalled", step: 1 }));
+    expect(report.issues).not.toContainEqual(expect.objectContaining({ kind: "opaque-focus-host" }));
+    expect(report.issues).not.toContainEqual(expect.objectContaining({ kind: "opaque-host-limit" }));
+    expect(report.stoppedBecause).toBe("stalled-on-element");
+    expect(report.tabPressCount).toBe(2);
   });
 
   it("continues beyond a cross-origin iframe with more than twenty controls", async () => {

@@ -7,6 +7,7 @@ const html = await readFile(new URL("index.html", root), "utf8");
 const css = await readFile(new URL("src/styles.css", root), "utf8");
 const docs = await readFile(new URL("docs.html", root), "utf8");
 const docsCss = await readFile(new URL("src/docs.css", root), "utf8");
+const documentedExample = await readFile(new URL("../../packages/focuspath/test-fixtures/documented-example.ts", root), "utf8");
 
 describe("website accessibility contract", () => {
   it("provides bypass navigation and a focusable main target", () => {
@@ -43,6 +44,11 @@ describe("website accessibility contract", () => {
     assert.match(docs, /report\.tabPressCount/);
     assert.match(docs, /custom element without an open shadow root is only treated as a candidate/);
     assert.match(docs, /OpenAPI specification/);
+    assert.match(docs, /import \{ scanFocusPath, generateHtmlReport \} from "focuspath"/);
+    assert.match(docs, /const html = generateHtmlReport\(report\)/);
+    assert.doesNotMatch(docs, /renderHtmlReport/);
+    assert.match(documentedExample, /import \{ generateHtmlReport, scanFocusPath \} from "focuspath"/);
+    assert.match(documentedExample, /return generateHtmlReport\(report\)/);
   });
 
   it("makes the documentation page bypassable and resilient to user preferences", () => {
@@ -51,5 +57,7 @@ describe("website accessibility contract", () => {
     assert.match(docsCss, /:focus-visible/);
     assert.match(docsCss, /@media\(prefers-reduced-motion:reduce\)/);
     assert.match(docsCss, /@media\(forced-colors:active\)/);
+    assert.match(docsCss, /grid-template-columns:minmax\(0,1fr\)/);
+    assert.match(docsCss, /\.contents,\.manual\{min-width:0\}/);
   });
 });
