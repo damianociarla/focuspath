@@ -86,6 +86,32 @@ describe("focus scanner", () => {
     expect(fixed?.rect).toMatchObject({ x: 14, y: 12 });
   });
 
+  it("remeasures sticky elements in the final screenshot state during reverse traversal", async () => {
+    const report = await scanFocusPath(page(`<style>body{margin:0}.sticky{position:sticky;top:0}.spacer{height:1400px}</style><button id="sticky" class="sticky">Sticky</button><div class="spacer"></div><button>Last</button>`), {
+      direction: "reverse",
+      focusSettleMs: 0,
+      viewport: { width: 800, height: 500 },
+    });
+
+    const sticky = report.steps.find((step) => step.selector === "#sticky");
+    expect(sticky?.rect.y).toBe(0);
+    expect(sticky?.visualEvidence).toEqual({ status: "plotted" });
+  });
+
+  it.each(["forward", "reverse"] as const)("uses transformed iframe quads during %s traversal", async (direction) => {
+    const report = await scanFocusPath(page(`<iframe id="frame" title="Transformed" style="width:400px;height:160px;transform:scale(.5) rotate(4deg);transform-origin:0 0" srcdoc='<button id="inside" style="width:100px;height:40px">Inside</button>'></iframe>`), {
+      direction,
+      focusSettleMs: 0,
+      viewport: { width: 800, height: 500 },
+    });
+
+    const inside = report.steps.find((step) => step.selector.includes("#inside"));
+    expect(inside?.quad).toHaveLength(8);
+    expect(inside?.rect.width).toBeLessThan(60);
+    expect(inside?.rect.height).toBeLessThan(30);
+    expect(inside?.visualEvidence).toEqual({ status: "plotted" });
+  });
+
   it("reports the actual captured pixels when root scrolling is locked", async () => {
     const report = await scanFocusPath(page(`<style>html,body{height:1600px;overflow:hidden}</style><button style="position:absolute;top:1400px">Deep control</button>`), {
       focusSettleMs: 0,
@@ -108,6 +134,30 @@ describe("focus scanner", () => {
     expect(scrolledSteps.every((step) => step.scrollContext?.selector === "#scroller")).toBe(true);
     expect(scrolledSteps.some((step) => (step.scrollContext?.scrollTop ?? 0) > 0)).toBe(true);
     expect(report.steps.at(-1)?.scrollContext).toBeUndefined();
+  });
+
+  it.each(["forward", "reverse"] as const)("treats overflow hidden as sequence-only evidence during %s traversal", async (direction) => {
+    const controls = Array.from({ length: 5 }, (_, index) => `<button style="display:block;height:70px">Hidden ${index + 1}</button>`).join("");
+    const report = await scanFocusPath(page(`<div id="clipper" style="height:120px;overflow:hidden">${controls}</div><a href="#after">After</a>`), {
+      direction,
+      focusSettleMs: 0,
+      viewport: { width: 800, height: 500 },
+    });
+
+    const hiddenSteps = report.steps.filter((step) => step.accessibleName.startsWith("Hidden"));
+    expect(hiddenSteps).toHaveLength(5);
+    expect(hiddenSteps.every((step) => step.scrollContexts?.some((context) => context.selector === "#clipper"))).toBe(true);
+    expect(hiddenSteps.every((step) => step.visualEvidence?.status === "sequence-only")).toBe(true);
+  });
+
+  it("treats overflow clip as a clipping context", async () => {
+    const report = await scanFocusPath(page(`<div id="clipper" style="height:50px;overflow:clip"><button style="margin-top:70px">Clipped</button></div>`), {
+      focusSettleMs: 0,
+      viewport: { width: 800, height: 500 },
+    });
+
+    expect(report.steps[0]?.scrollContexts).toContainEqual(expect.objectContaining({ selector: "#clipper" }));
+    expect(report.steps[0]?.visualEvidence).toEqual({ status: "sequence-only", reason: "scroll-or-clipping-context" });
   });
 
   it.each(["forward", "reverse"] as const)("records the nested iframe viewport during %s traversal", async (direction) => {

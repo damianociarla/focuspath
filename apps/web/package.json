@@ -1,12 +1,12 @@
 {
   "name": "@focuspath/web",
   "private": true,
-  "version": "0.4.3",
+  "version": "0.4.4",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test": "node --test test/*.test.mjs",
+    "test": "vite build && node --test test/*.test.mjs",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview"
   },

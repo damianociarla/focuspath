@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFileSync } from "node:fs";
 import { generateHtmlReport, ScanTimeoutError, scanFocusPath } from "focuspath";
+import { startPinnedEgressProxy } from "./egress-proxy.js";
 import { assertPublicUrl, createPublicUrlPolicy, parseHttpUrl, UnsafeUrlError } from "./network-policy.js";
 import { clientAddress, consumeRateLimits, hasValidOriginToken, SlidingWindowLimiter } from "./security.js";
 
@@ -21,6 +22,7 @@ const clientLimiter = new SlidingWindowLimiter(rateMax, rateWindowMs);
 const globalLimiter = new SlidingWindowLimiter(globalRateMax, 60 * 60_000, 1);
 const targetLimiter = new SlidingWindowLimiter(targetRateMax, 60 * 60_000);
 let activeScans = 0;
+const egressProxy = await startPinnedEgressProxy();
 
 const server = createServer(async (request, response) => {
   const origin = request.headers.origin;
@@ -106,6 +108,7 @@ const server = createServer(async (request, response) => {
       timeoutMs: scanTimeoutMs,
       viewport: { width: 1280, height: 800 },
       isUrlAllowed: createPublicUrlPolicy(),
+      proxyServer: egressProxy.url,
       maxRequests: 120,
       blockedResourceTypes: ["font", "media"],
       maxScreenshotHeight: 5_000,

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.4
+
+- Re-measure final focus geometry through Chromium border quads so sticky elements and transformed iframes align with the screenshot.
+- Classify visual evidence as plotted, partially visible, outside capture, or sequence-only while retaining traversal-time coordinates.
+- Treat `overflow:hidden` and `overflow:clip` ancestors as clipping contexts.
+- Route hosted Chromium traffic through a local DNS-pinning proxy that connects only to the validated public IP.
+- Test the production documentation build at 390 px with DM Mono loaded and long commands contained inside their own scrollers.
+
 ## 0.4.3
 
 - Size screenshot evidence from the JPEG pixels Chromium actually captured when a page locks root scrolling.
