@@ -21,6 +21,8 @@ focuspath <url> [options]
 
 If Chromium is not installed yet, run `npx playwright install chromium`.
 
+Node.js 24+ is the intentional tested runtime for the CLI and library.
+
 The command exits with code `1` when an error finding is present, `2` when scanning fails, and `0` otherwise.
 
 ## TypeScript API

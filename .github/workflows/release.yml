@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - run: npm install --global npm@11
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/check-release.mjs
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run pack:check --workspace focuspath
+      - name: Verify installable tarball
+        run: |
+          package_tarball="$(npm pack --workspace focuspath --json | node -e "let value='';process.stdin.on('data',chunk=>value+=chunk).on('end',()=>console.log(JSON.parse(value)[0].filename))")"
+          install_dir="$(mktemp -d)"
+          npm install --prefix "$install_dir" "./$package_tarball"
+          "$install_dir/node_modules/.bin/focuspath" --help
+      - run: npm publish --workspace focuspath
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" --verify-tag --title "FocusPath ${GITHUB_REF_NAME}" --generate-notes
