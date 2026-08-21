@@ -17,6 +17,7 @@ focuspath <url> [options]
 --max-steps <number>         Maximum observed focus stops (default: 50)
 --max-tab-presses <number>   Maximum total Tab presses (default: 4 × max-steps)
 --max-opaque-tab-presses <number> Repeated Tab limit per opaque host (default: 100)
+--direction <forward|reverse> Keyboard traversal direction (default: forward)
 --viewport <width>x<height>  Browser viewport (default: 1440x900)
 --headed                     Show Chromium while scanning
 ```
@@ -36,6 +37,7 @@ const report = await scanFocusPath("https://example.com", {
   maxSteps: 60,
   maxTabPresses: 240,
   maxOpaqueTabPresses: 120,
+  direction: "reverse",
   focusSettleMs: 100,
   viewport: { width: 1440, height: 900 },
 });
@@ -43,7 +45,7 @@ const report = await scanFocusPath("https://example.com", {
 const html = generateHtmlReport(report);
 ```
 
-The scanner currently targets Chromium. `maxSteps` limits observable report entries; `maxTabPresses` counts every Tab key press, including movement inside opaque hosts. Cross-origin frames and closed shadow roots inferred from repeated, uncanceled Tab movement use the independent `maxOpaqueTabPresses` budget. Canceled Tab events that leave focus in place are reported as stalled focus. The report exposes the effective limits and an exact stop reason. Computed outline and shadow values are recorded for manual review; FocusPath does not claim to automatically verify WCAG focus appearance.
+The scanner currently targets Chromium and supports forward `Tab` or reverse `Shift+Tab` traversal. `maxSteps` limits observable report entries; `maxTabPresses` counts every Tab key press, including movement inside opaque hosts. Cross-origin frames and closed shadow roots inferred from repeated, uncanceled Tab movement use the independent `maxOpaqueTabPresses` budget. Canceled Tab events that leave focus in place are reported as stalled focus. The report exposes its direction, effective limits, and exact stop reason. Computed outline and shadow values are recorded for manual review; FocusPath does not claim to automatically verify WCAG focus appearance.
 
 Repository, documentation, and issue tracker: [github.com/damianociarla/focuspath](https://github.com/damianociarla/focuspath)
 

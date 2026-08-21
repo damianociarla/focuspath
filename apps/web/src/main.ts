@@ -8,6 +8,7 @@ interface ScanIssue {
 
 interface ScanResponse {
   engineVersion: string;
+  direction: "forward" | "reverse";
   url: string;
   title: string;
   durationMs: number;

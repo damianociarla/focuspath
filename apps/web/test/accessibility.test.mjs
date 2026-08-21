@@ -41,6 +41,8 @@ describe("website accessibility contract", () => {
 
   it("documents traversal budgets, API metadata and opaque boundaries", () => {
     assert.match(docs, /--max-tab-presses/);
+    assert.match(docs, /--direction/);
+    assert.match(docs, /direction: "reverse"/);
     assert.match(docs, /report\.tabPressCount/);
     assert.match(docs, /custom element without an open shadow root is only treated as a candidate/);
     assert.match(docs, /OpenAPI specification/);
@@ -49,6 +51,7 @@ describe("website accessibility contract", () => {
     assert.doesNotMatch(docs, /renderHtmlReport/);
     assert.match(documentedExample, /import \{ generateHtmlReport, scanFocusPath \} from "focuspath"/);
     assert.match(documentedExample, /return generateHtmlReport\(report\)/);
+    assert.match(documentedExample, /direction: "reverse"/);
   });
 
   it("makes the documentation page bypassable and resilient to user preferences", () => {

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FocusPath Live Scanner API
-  version: 0.3.4
+  version: 0.4.0
   description: Rate-limited public demo API; not a general-purpose scanning service.
 paths:
   /health:
@@ -54,13 +54,14 @@ components:
     ScanResponse:
       type: object
       additionalProperties: false
-      required: [url, title, scannedAt, durationMs, engineVersion, tabPressCount, limits, stoppedBecause, steps, issues, reportHtml]
+      required: [url, title, scannedAt, durationMs, engineVersion, direction, tabPressCount, limits, stoppedBecause, steps, issues, reportHtml]
       properties:
         url: { type: string, format: uri }
         title: { type: string }
         scannedAt: { type: string, format: date-time }
         durationMs: { type: integer, minimum: 0 }
         engineVersion: { type: string }
+        direction: { type: string, enum: [forward, reverse] }
         tabPressCount: { type: integer, minimum: 0 }
         limits: { $ref: "#/components/schemas/TraversalLimits" }
         stoppedBecause: { $ref: "#/components/schemas/StopReason" }

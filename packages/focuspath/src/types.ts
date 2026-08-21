@@ -1,4 +1,5 @@
 export type IssueKind = "missing-name" | "missing-or-generic-role" | "positive-tabindex" | "focus-stalled" | "opaque-focus-host" | "opaque-host-limit";
+export type TraversalDirection = "forward" | "reverse";
 
 export interface TraversalLimits {
   maxSteps: number;
@@ -35,7 +36,8 @@ export interface FocusIssue {
 }
 
 export interface FocusReport {
-  version: 1;
+  version: 2;
+  direction: TraversalDirection;
   url: string;
   title: string;
   scannedAt: string;
@@ -51,6 +53,8 @@ export interface FocusReport {
 }
 
 export interface ScanOptions {
+  /** Keyboard traversal direction. Reverse uses Shift+Tab. Defaults to forward. */
+  direction?: TraversalDirection;
   /** Maximum number of observable focus stops recorded in the report. */
   maxSteps?: number;
   /** Maximum total Tab key presses, including movement inside opaque hosts. Defaults to maxSteps × 4. */

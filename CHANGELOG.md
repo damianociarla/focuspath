@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+- Add reverse keyboard traversal with `Shift+Tab` to the TypeScript API and CLI.
+- Record traversal direction in schema v2 reports, rendered HTML, and hosted API responses.
+- Document and compile-check bidirectional scanning examples.
+
 ## 0.3.4
 
 - Install Tab-cancellation instrumentation before page scripts execute.

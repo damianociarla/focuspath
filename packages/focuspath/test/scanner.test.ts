@@ -6,8 +6,20 @@ function page(markup: string): string {
 }
 
 describe("focus scanner", () => {
+  it("traverses focus in reverse with Shift+Tab", async () => {
+    const report = await scanFocusPath(page(`<button>First</button><button>Second</button><button>Third</button>`), {
+      direction: "reverse",
+      focusSettleMs: 0,
+    });
+    expect(report.direction).toBe("reverse");
+    expect(report.steps.map((step) => step.accessibleName)).toEqual(["Third", "Second", "First"]);
+    expect(report.tabPressCount).toBe(4);
+    expect(report.stoppedBecause).toBe("document-exhausted");
+  });
+
   it("uses Chromium's computed accessible name", async () => {
     const report = await scanFocusPath(page(`<button><img src="x" alt="Save"></button>`), { focusSettleMs: 0 });
+    expect(report.direction).toBe("forward");
     expect(report.steps[0]?.accessibleName).toBe("Save");
     expect(report.issues).not.toContainEqual(expect.objectContaining({ kind: "missing-name" }));
   });
@@ -139,6 +151,21 @@ describe("focus scanner", () => {
     expect(report.issues).not.toContainEqual(expect.objectContaining({ kind: "opaque-host-limit" }));
     expect(report.stoppedBecause).toBe("stalled-on-element");
     expect(report.tabPressCount).toBe(2);
+  });
+
+  it("detects canceled Shift+Tab during reverse traversal", async () => {
+    const report = await scanFocusPath(page(`<button>Before</button><user-chip tabindex="0">Profile</user-chip><script>
+      window.addEventListener('keydown', event => {
+        if (event.key !== 'Tab' || !event.shiftKey || document.activeElement?.tagName !== 'USER-CHIP') return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }, { capture: true });
+    </script>`), { direction: "reverse", focusSettleMs: 0 });
+    expect(report.steps.map((step) => step.tagName)).toEqual(["user-chip"]);
+    expect(report.issues).toContainEqual(expect.objectContaining({ kind: "focus-stalled", step: 1 }));
+    expect(report.issues).not.toContainEqual(expect.objectContaining({ kind: "opaque-focus-host" }));
+    expect(report.direction).toBe("reverse");
+    expect(report.stoppedBecause).toBe("stalled-on-element");
   });
 
   it("continues beyond a cross-origin iframe with more than twenty controls", async () => {

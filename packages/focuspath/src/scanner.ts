@@ -40,6 +40,9 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
   const maxSteps = positiveInteger(options.maxSteps ?? 50, "maxSteps");
   const maxTabPresses = positiveInteger(options.maxTabPresses ?? maxSteps * 4, "maxTabPresses");
   const maxOpaqueTabPresses = positiveInteger(options.maxOpaqueTabPresses ?? DEFAULT_MAX_OPAQUE_TAB_PRESSES, "maxOpaqueTabPresses");
+  const direction = options.direction ?? "forward";
+  if (direction !== "forward" && direction !== "reverse") throw new TypeError("direction must be either forward or reverse.");
+  const traversalKey = direction === "reverse" ? "Shift+Tab" : "Tab";
   const viewport = options.viewport ?? DEFAULT_VIEWPORT;
   const maxRequests = options.maxRequests ?? Number.POSITIVE_INFINITY;
   const blockedResourceTypes = new Set(options.blockedResourceTypes ?? []);
@@ -130,7 +133,7 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
       await page.evaluate(() => {
         (window as Window & { __focusPathTabCanceled?: boolean }).__focusPathTabCanceled = false;
       });
-      await page.keyboard.press("Tab");
+      await page.keyboard.press(traversalKey);
       tabPressCount += 1;
       await settleFocus(page, focusSettleMs);
       if (timedOut) throw new ScanTimeoutError(timeoutMs);
@@ -244,7 +247,8 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
     });
 
     return {
-      version: 1,
+      version: 2,
+      direction,
       url: page.url(),
       title: metadata.title,
       scannedAt: new Date().toISOString(),

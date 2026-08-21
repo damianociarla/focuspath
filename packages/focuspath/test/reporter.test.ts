@@ -9,7 +9,8 @@ describe("reporter", () => {
 
   it("renders focus nodes and issues", () => {
     const report: FocusReport = {
-      version: 1,
+      version: 2,
+      direction: "reverse",
       url: "https://example.com/",
       title: "Example",
       scannedAt: "2026-08-20T00:00:00.000Z",
@@ -29,10 +30,11 @@ describe("reporter", () => {
     expect(html).toContain("Focusable control has no computed accessible name.");
     expect(html).toContain("<circle cx=\"70\" cy=\"50\"");
     expect(html).toContain("Skip visual overview");
-    expect(html).toContain("<caption class=\"sr-only\">Focus stops in keyboard traversal order</caption>");
+    expect(html).toContain("<caption class=\"sr-only\">Focus stops in reverse keyboard traversal order</caption>");
     expect(html).toContain("<th scope=\"row\">1</th>");
     expect(html).toContain("aria-hidden=\"true\" focusable=\"false\"");
     expect(html).toContain("<dt>Tab presses</dt><dd>2</dd>");
+    expect(html).toContain("<dt>direction</dt><dd>reverse</dd>");
     expect(html).toContain("limits: 50 stops / 200 Tab presses / 100 per opaque host");
   });
 });

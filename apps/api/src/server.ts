@@ -102,6 +102,7 @@ const server = createServer(async (request, response) => {
 
     const report = await scanFocusPath(url.toString(), {
       headless: true,
+      direction: "forward",
       maxSteps,
       maxTabPresses,
       maxOpaqueTabPresses,
@@ -119,6 +120,7 @@ const server = createServer(async (request, response) => {
       scannedAt: report.scannedAt,
       durationMs: report.durationMs,
       engineVersion,
+      direction: report.direction,
       tabPressCount: report.tabPressCount,
       limits: report.limits,
       stoppedBecause: report.stoppedBecause,
