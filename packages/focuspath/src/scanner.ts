@@ -43,14 +43,27 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
   const focusSettleMs = options.focusSettleMs ?? DEFAULT_FOCUS_SETTLE_MS;
   let browser: Browser | undefined;
   let timedOut = false;
-  const timeout = setTimeout(() => {
-    timedOut = true;
-    void browser?.close();
-  }, timeoutMs);
+  let closePromise: Promise<void> | undefined;
+  const closeBrowser = (): Promise<void> => {
+    if (!browser) return Promise.resolve();
+    closePromise ??= browser.close().catch(() => undefined);
+    return closePromise;
+  };
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => {
+      timedOut = true;
+      reject(new ScanTimeoutError(timeoutMs));
+      void closeBrowser();
+    }, timeoutMs);
+  });
 
-  try {
+  const scan = async (): Promise<FocusReport> => {
     browser = await chromium.launch({ headless: options.headless ?? true });
-    if (timedOut) throw new ScanTimeoutError(timeoutMs);
+    if (timedOut) {
+      await closeBrowser();
+      throw new ScanTimeoutError(timeoutMs);
+    }
     const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
     const cdp = await page.context().newCDPSession(page);
     let requestCount = 0;
@@ -154,12 +167,16 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
       screenshot: `data:image/jpeg;base64,${screenshot.toString("base64")}`,
       stoppedBecause,
     };
-  } catch (error) {
-    if (timedOut && !(error instanceof ScanTimeoutError)) throw new ScanTimeoutError(timeoutMs);
-    throw error;
+  };
+
+  try {
+    return await Promise.race([deadline, scan()]);
   } finally {
-    clearTimeout(timeout);
-    await browser?.close().catch(() => undefined);
+    if (timeout) clearTimeout(timeout);
+    await Promise.race([
+      closeBrowser(),
+      new Promise<void>((resolve) => setTimeout(resolve, 1_000)),
+    ]);
   }
 }
 
