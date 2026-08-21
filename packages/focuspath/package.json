@@ -1,6 +1,6 @@
 {
   "name": "focuspath",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "See where keyboard navigation breaks. A visual accessibility scanner for focus order.",
   "type": "module",
   "license": "MIT",

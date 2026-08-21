@@ -70,6 +70,17 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
       throw new ScanTimeoutError(timeoutMs);
     }
     const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
+    await page.addInitScript(() => {
+      const state = window as Window & { __focusPathTabCanceled?: boolean };
+      const defer = window.setTimeout.bind(window);
+      state.__focusPathTabCanceled = false;
+      window.addEventListener("keydown", (event) => {
+        if (event.key !== "Tab") return;
+        defer(() => {
+          state.__focusPathTabCanceled = event.defaultPrevented;
+        }, 0);
+      }, { capture: true });
+    });
     const cdp = await page.context().newCDPSession(page);
     let requestCount = 0;
     if (options.isUrlAllowed || Number.isFinite(maxRequests) || blockedResourceTypes.size > 0) {
@@ -103,14 +114,6 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
     await page.evaluate(() => {
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
       window.scrollTo(0, 0);
-      const state = window as Window & { __focusPathTabCanceled?: boolean };
-      state.__focusPathTabCanceled = false;
-      document.addEventListener("keydown", (event) => {
-        if (event.key !== "Tab") return;
-        setTimeout(() => {
-          state.__focusPathTabCanceled = event.defaultPrevented;
-        }, 0);
-      }, { capture: true });
     });
 
     const steps: FocusStep[] = [];

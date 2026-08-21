@@ -125,6 +125,22 @@ describe("focus scanner", () => {
     expect(report.tabPressCount).toBe(2);
   });
 
+  it("observes Tab cancellation before page capture listeners can stop propagation", async () => {
+    const report = await scanFocusPath(page(`<user-chip tabindex="0">Profile</user-chip><button>After</button><script>
+      window.addEventListener('keydown', event => {
+        if (event.key !== 'Tab' || document.activeElement?.tagName !== 'USER-CHIP') return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }, { capture: true });
+    </script>`), { focusSettleMs: 0, maxOpaqueTabPresses: 3 });
+    expect(report.steps).toHaveLength(1);
+    expect(report.issues).toContainEqual(expect.objectContaining({ kind: "focus-stalled", step: 1 }));
+    expect(report.issues).not.toContainEqual(expect.objectContaining({ kind: "opaque-focus-host" }));
+    expect(report.issues).not.toContainEqual(expect.objectContaining({ kind: "opaque-host-limit" }));
+    expect(report.stoppedBecause).toBe("stalled-on-element");
+    expect(report.tabPressCount).toBe(2);
+  });
+
   it("continues beyond a cross-origin iframe with more than twenty controls", async () => {
     const controls = Array.from({ length: 21 }, (_, index) => `<button>Frame ${index + 1}</button>`).join("");
     const frame = page(controls);
