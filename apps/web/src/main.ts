@@ -43,8 +43,12 @@ for (const node of document.querySelectorAll<HTMLButtonElement>("[data-step]")) 
     const key = node.dataset.step ?? "3";
     const finding = findings[key];
     if (!finding) return;
-    document.querySelectorAll(".report-node").forEach((item) => item.classList.remove("active"));
+    document.querySelectorAll<HTMLButtonElement>(".report-node").forEach((item) => {
+      item.classList.remove("active");
+      item.setAttribute("aria-pressed", "false");
+    });
     node.classList.add("active");
+    node.setAttribute("aria-pressed", "true");
     setText("[data-finding-step]", key.padStart(2, "0"));
     setText("[data-finding-title]", finding.title);
     setText("[data-finding-code]", finding.code);
@@ -68,9 +72,11 @@ document.querySelectorAll(".proof-heading, .workflow-intro, .workflow-list li, .
 const scanForm = document.querySelector<HTMLFormElement>("[data-scan-form]");
 const scanApiUrl = import.meta.env.VITE_API_URL || (location.hostname === "localhost" || location.hostname === "127.0.0.1" ? "http://localhost:8787" : "");
 let reportObjectUrl = "";
+let scanInProgress = false;
 
 scanForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (scanInProgress) return;
   const input = scanForm.elements.namedItem("url");
   if (!(input instanceof HTMLInputElement) || !input.reportValidity()) return;
   if (!scanApiUrl) {
@@ -79,7 +85,8 @@ scanForm?.addEventListener("submit", async (event) => {
   }
 
   const button = scanForm.querySelector<HTMLButtonElement>("button[type='submit']");
-  if (button) button.disabled = true;
+  scanInProgress = true;
+  if (button) button.setAttribute("aria-disabled", "true");
   setScanState("progress");
   const started = Date.now();
   const stages = ["Opening page…", "Following keyboard focus…", "Drawing the route…"];
@@ -99,17 +106,23 @@ scanForm?.addEventListener("submit", async (event) => {
     const payload = await response.json() as ScanResponse | { error?: string };
     if (!response.ok || !("reportHtml" in payload)) throw new Error("error" in payload ? payload.error : "The scan could not be completed.");
     showScanResult(payload);
+    moveFocusFromButton(button, "[data-result-title]");
   } catch (error) {
     setScanState("error", error instanceof Error ? error.message : "The scan could not be completed.");
+    moveFocusFromButton(button, "[data-scan-error]");
   } finally {
     window.clearInterval(stageTimer);
-    if (button) button.disabled = false;
+    scanInProgress = false;
+    if (button) button.removeAttribute("aria-disabled");
   }
 });
 
 function setScanState(state: "idle" | "progress" | "error" | "result", error = ""): void {
   const output = document.querySelector<HTMLElement>("[data-scan-output]");
-  if (output) output.dataset.state = state;
+  if (output) {
+    output.dataset.state = state;
+    output.setAttribute("aria-busy", state === "progress" ? "true" : "false");
+  }
   for (const name of ["idle", "progress", "error", "result"] as const) {
     const element = document.querySelector<HTMLElement>(`[data-scan-${name}]`);
     if (element) element.hidden = name !== state;
@@ -122,6 +135,11 @@ function setScanState(state: "idle" | "progress" | "error" | "result", error = "
     setText("[data-scan-error-copy]", error);
     setText("[data-scan-elapsed]", "Stopped");
   }
+}
+
+function moveFocusFromButton(button: HTMLButtonElement | null, selector: string): void {
+  if (!button || document.activeElement !== button) return;
+  document.querySelector<HTMLElement>(selector)?.focus({ preventScroll: false });
 }
 
 function showScanResult(result: ScanResponse): void {

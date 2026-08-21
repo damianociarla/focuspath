@@ -61,22 +61,23 @@
     </script>
   </head>
   <body>
+    <a class="skip-link" href="#top">Skip to main content</a>
     <header class="nav">
-      <a class="wordmark" href="#top" aria-label="FocusPath home"><span>F</span>FocusPath</a>
+      <a class="wordmark" href="#top"><span aria-hidden="true">F</span>FocusPath</a>
       <nav aria-label="Primary navigation">
         <a href="#how">How it works</a>
         <a href="https://github.com/damianociarla/focuspath">GitHub ↗</a>
       </nav>
     </header>
 
-    <main id="top">
+    <main id="top" tabindex="-1">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
           <p class="eyebrow reveal">Open-source accessibility tooling</p>
           <h1 id="hero-title" class="reveal">See where keyboard navigation <em>breaks.</em></h1>
           <p class="intro reveal">FocusPath follows every Tab stop, draws the route, and turns invisible focus bugs into a report your team can act on.</p>
           <div class="hero-actions reveal">
-            <button class="primary" data-copy-command><span>npx focuspath https://your-site.com</span><b>Copy</b></button>
+            <button class="primary" data-copy-command><span>npx focuspath https://your-site.com</span><b aria-live="polite" aria-atomic="true">Copy</b></button>
             <a class="text-link" href="#demo">View the path ↓</a>
           </div>
         </div>
@@ -111,23 +112,23 @@
             <p id="scan-terms">Public HTTP(S) pages only. By continuing, you confirm you are authorized to test this page.</p>
           </form>
 
-          <div class="scan-output" data-scan-output data-state="idle" aria-live="polite">
+          <div class="scan-output" data-scan-output data-state="idle" aria-busy="false">
             <div class="scan-output-head"><span>FocusPath browser</span><span data-scan-elapsed>Ready</span></div>
             <div class="scan-idle" data-scan-idle>
               <i></i>
               <p>Waiting for a URL</p>
             </div>
-            <div class="scan-progress" data-scan-progress hidden>
+            <div class="scan-progress" data-scan-progress role="status" aria-live="polite" aria-atomic="true" hidden>
               <div class="progress-line"><i></i></div>
               <p data-scan-stage>Opening page…</p>
               <small>Scanning one page · maximum 50 focus stops</small>
             </div>
-            <div class="scan-error" data-scan-error hidden>
+            <div class="scan-error" data-scan-error role="alert" aria-atomic="true" tabindex="-1" hidden>
               <span>Scan failed</span>
               <p data-scan-error-copy></p>
             </div>
-            <div class="scan-result" data-scan-result hidden>
-              <div class="result-title"><span data-result-status>Complete</span><h3 data-result-title></h3><p data-result-url></p></div>
+            <div class="scan-result" data-scan-result role="region" aria-labelledby="result-title" hidden>
+              <div class="result-title"><span data-result-status>Complete</span><h3 id="result-title" data-result-title tabindex="-1"></h3><p data-result-url></p></div>
               <div class="result-metrics"><div><strong data-result-stops>0</strong><span>Stops</span></div><div><strong data-result-errors>0</strong><span>Errors</span></div><div><strong data-result-warnings>0</strong><span>Warnings</span></div></div>
               <ul class="result-issues" data-result-issues></ul>
               <div class="result-actions"><a data-open-report href="#scan" target="_blank" rel="noopener">Open report ↗</a><a data-download-report href="#scan" download="focuspath-report.html">Download HTML ↓</a></div>
@@ -154,11 +155,11 @@
             <svg viewBox="0 0 1000 600" preserveAspectRatio="none" aria-hidden="true">
               <path class="report-path" d="M88 54 C 330 50, 170 190, 438 212 S 658 128, 760 246 S 680 460, 884 504" />
             </svg>
-            <button class="report-node node-1" data-step="1" aria-label="Inspect focus step 1">1</button>
-            <button class="report-node node-2" data-step="2" aria-label="Inspect focus step 2">2</button>
-            <button class="report-node node-3 warning" data-step="3" aria-label="Inspect focus step 3, warning">3</button>
-            <button class="report-node node-4" data-step="4" aria-label="Inspect focus step 4">4</button>
-            <aside class="finding" aria-live="polite">
+            <button class="report-node node-1" data-step="1" aria-label="Inspect focus step 1" aria-controls="finding-panel" aria-pressed="false">1</button>
+            <button class="report-node node-2" data-step="2" aria-label="Inspect focus step 2" aria-controls="finding-panel" aria-pressed="false">2</button>
+            <button class="report-node node-3 warning active" data-step="3" aria-label="Inspect focus step 3, warning" aria-controls="finding-panel" aria-pressed="true">3</button>
+            <button class="report-node node-4" data-step="4" aria-label="Inspect focus step 4" aria-controls="finding-panel" aria-pressed="false">4</button>
+            <aside class="finding" id="finding-panel" aria-live="polite" aria-atomic="true">
               <p>Step <span data-finding-step>03</span></p>
               <strong data-finding-title>Missing accessible name</strong>
               <code data-finding-code>button.icon-only</code>
@@ -185,13 +186,13 @@
         <p class="eyebrow">MIT licensed · built in TypeScript</p>
         <h2 id="cta-title">Make focus visible.</h2>
         <div>
-          <button class="primary" data-copy-command><span>npx focuspath https://your-site.com</span><b>Copy</b></button>
+          <button class="primary" data-copy-command><span>npx focuspath https://your-site.com</span><b aria-live="polite" aria-atomic="true">Copy</b></button>
           <a class="text-link" href="https://github.com/damianociarla/focuspath">Read the source ↗</a>
         </div>
       </section>
     </main>
 
-    <footer><a class="wordmark" href="#top"><span>F</span>FocusPath</a><p>Built by <a href="https://github.com/damianociarla">Damiano Ciarla</a> for a more navigable web.</p></footer>
+    <footer><a class="wordmark" href="#top"><span aria-hidden="true">F</span>FocusPath</a><p>Built by <a href="https://github.com/damianociarla">Damiano Ciarla</a> for a more navigable web.</p></footer>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

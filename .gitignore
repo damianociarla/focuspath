@@ -9,3 +9,4 @@ focuspath-report.html
 .DS_Store
 *.log
 .npmrc
+infra/aws/.origin-verify-token
