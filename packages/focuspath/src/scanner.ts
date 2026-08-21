@@ -4,7 +4,7 @@ import type { FocusIssue, FocusReport, FocusStep, ScanOptions } from "./types.js
 const DEFAULT_VIEWPORT = { width: 1440, height: 900 };
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_FOCUS_SETTLE_MS = 75;
-const MAX_OPAQUE_TABS_PER_HOST = 20;
+const DEFAULT_MAX_OPAQUE_TAB_PRESSES = 100;
 const NAMED_CONTROL_ROLES = new Set([
   "button", "checkbox", "combobox", "link", "listbox", "menuitem", "menuitemcheckbox", "menuitemradio",
   "option", "radio", "searchbox", "slider", "spinbutton", "switch", "tab", "textbox", "treeitem",
@@ -26,7 +26,7 @@ const DEEPEST_ACTIVE_ELEMENT_EXPRESSION = `(() => {
   return element;
 })()`;
 
-type ObservedFocusStep = FocusStep & { opaqueHost: boolean };
+type ObservedFocusStep = FocusStep & { confirmedOpaqueHost: boolean; opaqueCandidate: boolean };
 
 export class ScanTimeoutError extends Error {
   constructor(timeoutMs: number) {
@@ -37,7 +37,9 @@ export class ScanTimeoutError extends Error {
 
 export async function scanFocusPath(url: string, options: ScanOptions = {}): Promise<FocusReport> {
   const startedAt = Date.now();
-  const maxSteps = options.maxSteps ?? 50;
+  const maxSteps = positiveInteger(options.maxSteps ?? 50, "maxSteps");
+  const maxTabPresses = positiveInteger(options.maxTabPresses ?? maxSteps * 4, "maxTabPresses");
+  const maxOpaqueTabPresses = positiveInteger(options.maxOpaqueTabPresses ?? DEFAULT_MAX_OPAQUE_TAB_PRESSES, "maxOpaqueTabPresses");
   const viewport = options.viewport ?? DEFAULT_VIEWPORT;
   const maxRequests = options.maxRequests ?? Number.POSITIVE_INFINITY;
   const blockedResourceTypes = new Set(options.blockedResourceTypes ?? []);
@@ -108,11 +110,14 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
     const seen = new Map<string, number>();
     let stoppedBecause: FocusReport["stoppedBecause"] = "step-limit";
     let previousSelector = "";
-    let previousWasOpaque = false;
+    let previousWasConfirmedOpaque = false;
+    let previousWasOpaqueCandidate = false;
     let opaqueTabCount = 0;
+    let tabPressCount = 0;
 
-    while (steps.length < maxSteps) {
+    while (steps.length < maxSteps && tabPressCount < maxTabPresses) {
       await page.keyboard.press("Tab");
+      tabPressCount += 1;
       await settleFocus(page, focusSettleMs);
       if (timedOut) throw new ScanTimeoutError(timeoutMs);
       const observed = await readActiveElement(page, cdp, steps.length + 1);
@@ -122,25 +127,44 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
         break;
       }
 
-      if (observed.selector === previousSelector && previousWasOpaque && observed.opaqueHost) {
+      const repeatedSelector = observed.selector === previousSelector;
+      const repeatedOpaqueHost = repeatedSelector && (
+        previousWasConfirmedOpaque
+        || observed.confirmedOpaqueHost
+        || (previousWasOpaqueCandidate && observed.opaqueCandidate)
+      );
+
+      if (repeatedOpaqueHost) {
+        const hostStep = seen.get(observed.selector) ?? Math.max(1, steps.length);
+        if (!previousWasConfirmedOpaque) {
+          previousWasConfirmedOpaque = true;
+          issues.push({
+            kind: "opaque-focus-host",
+            severity: "warning",
+            step: hostStep,
+            selector: observed.selector,
+            message: "Repeated focus indicates a closed shadow root whose internal controls cannot be inspected.",
+          });
+        }
         opaqueTabCount += 1;
-        if (opaqueTabCount < MAX_OPAQUE_TABS_PER_HOST) continue;
+        if (opaqueTabCount < maxOpaqueTabPresses) continue;
         issues.push({
-          kind: "focus-stalled",
+          kind: "opaque-host-limit",
           severity: "warning",
-          step: observed.index,
+          step: hostStep,
           selector: observed.selector,
-          message: `Focus did not leave the opaque host after ${MAX_OPAQUE_TABS_PER_HOST} additional Tab presses.`,
+          message: `Focus did not leave the opaque host within ${maxOpaqueTabPresses} repeated Tab presses.`,
         });
-        stoppedBecause = "stalled-on-element";
+        stoppedBecause = "opaque-host-limit";
         break;
       }
 
-      if (observed.selector === previousSelector) {
+      if (repeatedSelector) {
+        const existingStep = seen.get(observed.selector) ?? Math.max(1, steps.length);
         issues.push({
           kind: "focus-stalled",
           severity: "warning",
-          step: observed.index,
+          step: existingStep,
           selector: observed.selector,
           message: "Focus did not move after pressing Tab.",
         });
@@ -153,21 +177,27 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
         break;
       }
 
-      const { opaqueHost, ...step } = observed;
+      const { confirmedOpaqueHost, opaqueCandidate, ...step } = observed;
       seen.set(step.selector, step.index);
       previousSelector = step.selector;
-      previousWasOpaque = opaqueHost;
+      previousWasConfirmedOpaque = confirmedOpaqueHost;
+      previousWasOpaqueCandidate = opaqueCandidate;
       opaqueTabCount = 0;
       steps.push(step);
-      if (opaqueHost) {
+      issues.push(...issuesFor(step));
+      if (confirmedOpaqueHost) {
         issues.push({
           kind: "opaque-focus-host",
           severity: "warning",
           step: step.index,
           selector: step.selector,
-          message: "Focus entered a cross-origin frame or closed shadow root whose internal controls cannot be inspected.",
+          message: "Focus entered a cross-origin frame whose internal controls cannot be inspected.",
         });
-      } else issues.push(...issuesFor(step));
+      }
+    }
+
+    if (steps.length < maxSteps && tabPressCount >= maxTabPresses && stoppedBecause === "step-limit") {
+      stoppedBecause = "tab-press-limit";
     }
 
     await page.evaluate(() => window.scrollTo(0, 0));
@@ -190,6 +220,8 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
       title: metadata.title,
       scannedAt: new Date().toISOString(),
       durationMs: Date.now() - startedAt,
+      tabPressCount,
+      limits: { maxSteps, maxTabPresses, maxOpaqueTabPresses },
       viewport,
       document: { width: captureWidth, height: captureHeight },
       steps,
@@ -212,6 +244,11 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
 
 function remainingTime(startedAt: number, timeoutMs: number): number {
   return Math.max(1, timeoutMs - (Date.now() - startedAt));
+}
+
+function positiveInteger(value: number, name: string): number {
+  if (!Number.isInteger(value) || value < 1) throw new TypeError(`${name} must be a positive integer.`);
+  return value;
 }
 
 async function settleFocus(page: Page, delayMs: number): Promise<void> {
@@ -307,7 +344,8 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
 
   return page.evaluate(({ stepIndex, computedName, accessibilityRole }) => {
     let element = document.activeElement;
-    let opaqueHost = false;
+    let confirmedOpaqueHost = false;
+    let opaqueCandidate = false;
     while (element?.nodeType === Node.ELEMENT_NODE) {
       const current = element as HTMLElement;
       const shadowActive = current.shadowRoot?.activeElement;
@@ -318,19 +356,21 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
       if (current.tagName === "IFRAME") {
         try {
           const frame = current as HTMLIFrameElement;
-          const frameActive = frame.contentDocument?.activeElement;
-          if (frameActive?.nodeType === Node.ELEMENT_NODE && frameActive !== frame.contentDocument?.body) {
+          const frameDocument = frame.contentDocument;
+          const frameActive = frameDocument?.activeElement;
+          if (frameActive?.nodeType === Node.ELEMENT_NODE && frameActive !== frameDocument?.body) {
             element = frameActive as HTMLElement;
             continue;
           }
+          if (!frameDocument) confirmedOpaqueHost = true;
         } catch {
           // Cross-origin frame contents are intentionally opaque.
+          confirmedOpaqueHost = true;
         }
-        opaqueHost = true;
       } else if (current.tagName.includes("-") && current.shadowRoot === null) {
-        // A focused custom-element host without an open root may represent focus
-        // delegated into a closed shadow tree. Repeated observations are opaque.
-        opaqueHost = true;
+        // A custom element without an open root is only a candidate. It becomes
+        // opaque after a repeated observation proves that focus moved internally.
+        opaqueCandidate = true;
       }
       break;
     }
@@ -368,7 +408,8 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
         outline: `${styles.outlineWidth} ${styles.outlineStyle} ${styles.outlineColor}`,
         boxShadow: styles.boxShadow,
       },
-      opaqueHost,
+      confirmedOpaqueHost,
+      opaqueCandidate,
     };
 
     function absoluteRect(node: HTMLElement): { x: number; y: number; width: number; height: number } {

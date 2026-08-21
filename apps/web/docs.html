@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FocusPath Documentation — CLI, TypeScript API and scan limits</title>
+    <meta name="description" content="Install FocusPath, run keyboard focus scans from the CLI or TypeScript API, and understand its traversal limits, findings and HTTP API." />
+    <meta name="author" content="Damiano Ciarla" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#090b0a" />
+    <link rel="canonical" href="https://damianociarla.github.io/focuspath/docs.html" />
+    <link rel="icon" href="%BASE_URL%favicon.svg" type="image/svg+xml" sizes="any" />
+    <link rel="icon" href="%BASE_URL%favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="%BASE_URL%apple-touch-icon.png" sizes="180x180" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="FocusPath" />
+    <meta property="og:url" content="https://damianociarla.github.io/focuspath/docs.html" />
+    <meta property="og:title" content="FocusPath Documentation" />
+    <meta property="og:description" content="CLI, TypeScript API, traversal model and security limits for FocusPath." />
+    <meta property="og:image" content="https://damianociarla.github.io/focuspath/social-card.png" />
+    <meta property="og:image:alt" content="FocusPath logo and the message See where keyboard navigation breaks" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="stylesheet" href="/src/docs.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#documentation">Skip to documentation</a>
+    <header class="docs-header">
+      <a class="wordmark" href="./index.html"><span aria-hidden="true">F</span>FocusPath</a>
+      <nav aria-label="Documentation navigation"><a href="./index.html">Live scanner</a><a href="https://github.com/damianociarla/focuspath">GitHub ↗</a></nav>
+    </header>
+
+    <main id="documentation" tabindex="-1">
+      <section class="docs-hero" aria-labelledby="docs-title">
+        <div><p class="eyebrow">Documentation / v0.3.2</p><h1 id="docs-title">Map the route.<br /><em>Keep the evidence.</em></h1></div>
+        <div class="hero-note"><p>FocusPath follows forward Tab navigation in a real Chromium session, records observable focus stops, and produces a portable HTML report.</p><div><a class="action" href="#install">Install</a><a href="https://github.com/damianociarla/focuspath/blob/main/docs/openapi.yml">OpenAPI ↗</a></div></div>
+      </section>
+
+      <div class="docs-layout">
+        <aside class="contents" aria-label="On this page"><p>On this page</p><ol><li><a href="#install">Install and CLI</a></li><li><a href="#library">TypeScript API</a></li><li><a href="#traversal">Traversal model</a></li><li><a href="#http-api">HTTP API</a></li><li><a href="#security">Security and privacy</a></li></ol></aside>
+        <article class="manual">
+          <section id="install" aria-labelledby="install-title">
+            <p class="section-number">01 / Run</p><h2 id="install-title">Install and CLI</h2>
+            <p>Run once with <code>npx</code>, or install the package in a project. The CLI writes a self-contained HTML report by default.</p>
+            <pre><code>npx focuspath https://example.com
+npm install --save-dev focuspath
+npx focuspath https://example.com --output ./focus-report.html</code></pre>
+            <h3>Traversal budgets</h3>
+            <dl class="option-list"><div><dt><code>--max-steps</code></dt><dd>Maximum observable focus stops. Default: <strong>50</strong>.</dd></div><div><dt><code>--max-tab-presses</code></dt><dd>Total forward Tab presses, including movement hidden inside opaque hosts. Default: <strong>200</strong>.</dd></div><div><dt><code>--max-opaque-tab-presses</code></dt><dd>Repeated presses tolerated at one opaque host. Default: <strong>100</strong>.</dd></div></dl>
+          </section>
+
+          <section id="library" aria-labelledby="library-title">
+            <p class="section-number">02 / Integrate</p><h2 id="library-title">TypeScript API</h2>
+            <p>The public API is typed and returns both observed stops and the exact limits used by the scan.</p>
+            <pre><code>import { scanFocusPath, renderHtmlReport } from "focuspath";
+
+const report = await scanFocusPath("https://example.com", {
+  maxSteps: 50,
+  maxTabPresses: 200,
+  maxOpaqueTabPresses: 100,
+  timeoutMs: 30_000,
+});
+
+console.log(report.tabPressCount, report.limits);
+const html = renderHtmlReport(report);</code></pre>
+            <p class="callout"><strong>Contract:</strong> issue step numbers always reference a step present in <code>report.steps</code>. Tab presses are counted separately because not every press exposes an inspectable element.</p>
+          </section>
+
+          <section id="traversal" aria-labelledby="traversal-title">
+            <p class="section-number">03 / Understand</p><h2 id="traversal-title">Traversal model</h2>
+            <div class="model" role="list" aria-label="FocusPath traversal stages"><div role="listitem"><span>Tab</span><p>Chromium performs the native forward keyboard action.</p></div><div role="listitem"><span>Observe</span><p>The deepest inspectable active element becomes a focus stop.</p></div><div role="listitem"><span>Explain</span><p>Deterministic findings are attached to that existing stop.</p></div></div>
+            <h3>Opaque boundaries</h3>
+            <p>Cross-origin iframes are known to be opaque. A custom element without an open shadow root is only treated as a candidate; FocusPath infers a closed shadow root only when repeated Tab presses keep focus on that host. Internal controls cannot be named or positioned, but traversal may continue within the independent Tab budget.</p>
+            <p>FocusPath detects missing accessible names, generic roles, positive <code>tabindex</code>, cycles and stalled focus. It is evidence for review—not a WCAG certification.</p>
+          </section>
+
+          <section id="http-api" aria-labelledby="http-title">
+            <p class="section-number">04 / Automate</p><h2 id="http-title">HTTP API</h2>
+            <p>The hosted beta accepts a public HTTP(S) URL from the FocusPath website. Responses expose the engine version, elapsed time, Tab count, traversal limits, findings and generated report.</p>
+            <pre><code>POST /v1/scans
+Content-Type: application/json
+
+{ "url": "https://example.com" }</code></pre>
+            <p>The canonical machine-readable contract is the <a href="https://github.com/damianociarla/focuspath/blob/main/docs/openapi.yml">OpenAPI specification</a>. The public edge applies origin checks, request throttling, concurrency control, timeouts and response-size limits; those controls reduce abuse but do not make a browser API private.</p>
+          </section>
+
+          <section id="security" aria-labelledby="security-title">
+            <p class="section-number">05 / Boundaries</p><h2 id="security-title">Security and privacy</h2>
+            <p>Only scan pages you are authorized to test. The submitted URL is fetched in a temporary Chromium session on AWS. FocusPath does not intentionally persist page content, screenshots or generated reports after the response completes.</p>
+            <ul class="plain-list"><li>Infrastructure providers may retain request metadata in operational logs according to their configured retention.</li><li>Private, loopback, link-local and cloud-metadata destinations are rejected, including redirects and browser subrequests.</li><li>Network-layer egress isolation is not yet a substitute for application checks and remains a documented hardening opportunity.</li><li>The optional AWS WAF layer is intentionally disabled in the low-cost deployment.</li></ul>
+            <p class="fine-print">No automated scan covers every keyboard direction, browser, assistive technology, focus-indicator contrast or interaction state. Pair the report with manual keyboard and screen-reader testing.</p>
+          </section>
+        </article>
+      </div>
+    </main>
+    <footer><a class="wordmark" href="./index.html"><span aria-hidden="true">F</span>FocusPath</a><p>MIT licensed · built in TypeScript · <a href="https://github.com/damianociarla/focuspath">Source on GitHub</a></p></footer>
+  </body>
+</html>

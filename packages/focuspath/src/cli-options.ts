@@ -4,6 +4,8 @@ export interface CliOptions {
   url: string;
   output: string;
   maxSteps: number;
+  maxTabPresses: number;
+  maxOpaqueTabPresses: number;
   viewport: { width: number; height: number };
   headed: boolean;
   help: boolean;
@@ -17,23 +19,31 @@ export function parseCliOptions(args: string[]): CliOptions {
     options: {
       output: { type: "string", short: "o", default: "focuspath-report.html" },
       "max-steps": { type: "string", default: "50" },
+      "max-tab-presses": { type: "string" },
+      "max-opaque-tab-presses": { type: "string", default: "100" },
       viewport: { type: "string", default: "1440x900" },
       headed: { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
     },
   });
 
-  if (values.help) return { url: "", output: values.output, maxSteps: 50, viewport: { width: 1440, height: 900 }, headed: values.headed, help: true };
+  if (values.help) return { url: "", output: values.output, maxSteps: 50, maxTabPresses: 200, maxOpaqueTabPresses: 100, viewport: { width: 1440, height: 900 }, headed: values.headed, help: true };
   if (positionals.length === 0) throw new Error("Missing URL. Run focuspath --help for usage.");
   if (positionals.length > 1) throw new Error(`Unexpected argument: ${positionals[1]}`);
 
   const maxSteps = Number(values["max-steps"]);
   if (!Number.isInteger(maxSteps) || maxSteps < 1 || maxSteps > 500) throw new Error("--max-steps must be an integer between 1 and 500.");
+  const maxTabPresses = values["max-tab-presses"] === undefined ? maxSteps * 4 : Number(values["max-tab-presses"]);
+  if (!Number.isInteger(maxTabPresses) || maxTabPresses < 1 || maxTabPresses > 10_000) throw new Error("--max-tab-presses must be an integer between 1 and 10000.");
+  const maxOpaqueTabPresses = Number(values["max-opaque-tab-presses"]);
+  if (!Number.isInteger(maxOpaqueTabPresses) || maxOpaqueTabPresses < 1 || maxOpaqueTabPresses > 5_000) throw new Error("--max-opaque-tab-presses must be an integer between 1 and 5000.");
 
   return {
     url: normalizeUrl(positionals[0] ?? ""),
     output: values.output,
     maxSteps,
+    maxTabPresses,
+    maxOpaqueTabPresses,
     viewport: parseViewport(values.viewport),
     headed: values.headed,
     help: false,

@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { readFileSync } from "node:fs";
 import { generateHtmlReport, ScanTimeoutError, scanFocusPath } from "focuspath";
 import { assertPublicUrl, createPublicUrlPolicy, parseHttpUrl, UnsafeUrlError } from "./network-policy.js";
 import { clientAddress, hasValidOriginToken, SlidingWindowLimiter } from "./security.js";
@@ -6,7 +7,10 @@ import { clientAddress, hasValidOriginToken, SlidingWindowLimiter } from "./secu
 const port = Number(process.env.PORT ?? 8787);
 const maxConcurrentScans = Number(process.env.MAX_CONCURRENT_SCANS ?? 2);
 const maxSteps = Number(process.env.MAX_FOCUS_STEPS ?? 50);
+const maxTabPresses = Number(process.env.MAX_TAB_PRESSES ?? maxSteps * 4);
+const maxOpaqueTabPresses = Number(process.env.MAX_OPAQUE_TAB_PRESSES ?? 100);
 const scanTimeoutMs = Number(process.env.SCAN_TIMEOUT_MS ?? 25_000);
+const engineVersion = (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version;
 const originVerifyToken = process.env.ORIGIN_VERIFY_TOKEN ?? "";
 const allowedOrigins = new Set((process.env.ALLOWED_ORIGINS ?? "http://localhost:5173,http://127.0.0.1:5173,https://damianociarla.github.io").split(",").map((origin) => origin.trim()).filter(Boolean));
 const rateWindowMs = 10 * 60_000;
@@ -33,7 +37,7 @@ const server = createServer(async (request, response) => {
   }
 
   if (request.method === "GET" && request.url === "/health") {
-    json(response, 200, { status: "ok", activeScans });
+    json(response, 200, { status: "ok", version: engineVersion, activeScans });
     return;
   }
 
@@ -99,6 +103,8 @@ const server = createServer(async (request, response) => {
     const report = await scanFocusPath(url.toString(), {
       headless: true,
       maxSteps,
+      maxTabPresses,
+      maxOpaqueTabPresses,
       timeoutMs: scanTimeoutMs,
       viewport: { width: 1280, height: 800 },
       isUrlAllowed: createPublicUrlPolicy(),
@@ -112,6 +118,9 @@ const server = createServer(async (request, response) => {
       title: report.title,
       scannedAt: report.scannedAt,
       durationMs: report.durationMs,
+      engineVersion,
+      tabPressCount: report.tabPressCount,
+      limits: report.limits,
       stoppedBecause: report.stoppedBecause,
       steps: report.steps,
       issues: report.issues,

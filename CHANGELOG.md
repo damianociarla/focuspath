@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.2
+
+- Infer closed shadow roots only after repeated focus, preserving deterministic findings on ordinary custom elements.
+- Separate observable focus stops from total Tab presses and expose both traversal budgets in reports and the API.
+- Make total and per-opaque-host Tab limits configurable with precise stop reasons and step references.
+- Continue beyond large cross-origin frames under the expanded default opaque-host budget.
+- Add public documentation for CLI, library, API, privacy, and operational security limits.
+
 ## 0.3.1
 
 - Continue keyboard traversal beyond cross-origin iframes and closed shadow roots with bounded opaque-host handling.

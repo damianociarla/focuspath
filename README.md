@@ -20,7 +20,7 @@ npx focuspath https://example.com
 
 ## Scope and limitations
 
-FocusPath is an early diagnostic tool, not a WCAG conformance test. It currently runs Chromium and follows forward `Tab` navigation. Cross-origin iframes and closed shadow roots are represented as opaque focus hosts so traversal can continue, but their internal controls cannot be inspected. Dynamic interfaces, platform-specific widgets, reverse navigation, and focus appearance still require manual and cross-browser testing. Outline and box-shadow values are evidence for a reviewer; FocusPath does not automatically certify WCAG focus appearance.
+FocusPath is an early diagnostic tool, not a WCAG conformance test. It currently runs Chromium and follows forward `Tab` navigation. Cross-origin iframes are represented as opaque hosts; closed shadow roots are inferred only when repeated focus makes them observable. Their internal controls cannot be inspected. Traversal is bounded separately by observable stops, total Tab presses, and repeated presses within one opaque host. Dynamic interfaces, platform-specific widgets, reverse navigation, and focus appearance still require manual and cross-browser testing.
 
 ## Usage
 
@@ -30,6 +30,9 @@ npx focuspath https://example.com
 
 # Choose a viewport and maximum number of stops
 npx focuspath localhost:3000 --viewport 390x844 --max-steps 80
+
+# Bound total traversal and one large opaque widget independently
+npx focuspath example.com --max-tab-presses 320 --max-opaque-tab-presses 160
 
 # Choose the report path
 npx focuspath https://example.com --output reports/home.html
@@ -51,6 +54,8 @@ import { generateHtmlReport, scanFocusPath } from "focuspath";
 const result = await scanFocusPath("http://localhost:3000", {
   viewport: { width: 1440, height: 900 },
   maxSteps: 60,
+  maxTabPresses: 240,
+  maxOpaqueTabPresses: 120,
   focusSettleMs: 100,
 });
 
@@ -97,7 +102,9 @@ Content-Type: application/json
 {"url":"https://example.com"}
 ```
 
-The response contains scan metadata, focus stops, findings, and a self-contained `reportHtml` document. `GET /health` reports API readiness. The beta API intentionally accepts only public HTTP(S) targets on ports 80 and 443, revalidates DNS for browser requests, limits scan duration and request volume, and rate-limits clients and target hostnames. Complete SSRF containment still requires infrastructure-enforced egress filtering; see the AWS infrastructure notes.
+The response contains the engine version, total Tab count, effective traversal limits, focus stops, findings, and a self-contained `reportHtml` document. `GET /health` reports API readiness and engine version. The beta API intentionally accepts only public HTTP(S) targets on ports 80 and 443, revalidates DNS for browser requests, limits scan duration and request volume, and rate-limits clients and target hostnames. Complete SSRF containment still requires infrastructure-enforced egress filtering; see the AWS infrastructure notes.
+
+FocusPath does not intentionally persist submitted page content or generated reports. AWS and GitHub may retain request metadata according to their operational logging policies; no application-level report store is configured for the beta.
 
 The response contract and error statuses are documented in [OpenAPI 3.1](docs/openapi.yml).
 

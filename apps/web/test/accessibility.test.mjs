@@ -5,6 +5,8 @@ import { describe, it } from "node:test";
 const root = new URL("../", import.meta.url);
 const html = await readFile(new URL("index.html", root), "utf8");
 const css = await readFile(new URL("src/styles.css", root), "utf8");
+const docs = await readFile(new URL("docs.html", root), "utf8");
+const docsCss = await readFile(new URL("src/docs.css", root), "utf8");
 
 describe("website accessibility contract", () => {
   it("provides bypass navigation and a focusable main target", () => {
@@ -34,5 +36,20 @@ describe("website accessibility contract", () => {
     assert.match(html, /<summary>Privacy and scan limitations<\/summary>/);
     assert.match(html, /does not certify WCAG conformance/);
     assert.match(html, /does not intentionally persist page content or reports/);
+  });
+
+  it("documents traversal budgets, API metadata and opaque boundaries", () => {
+    assert.match(docs, /--max-tab-presses/);
+    assert.match(docs, /report\.tabPressCount/);
+    assert.match(docs, /custom element without an open shadow root is only treated as a candidate/);
+    assert.match(docs, /OpenAPI specification/);
+  });
+
+  it("makes the documentation page bypassable and resilient to user preferences", () => {
+    assert.match(docs, /class="skip-link" href="#documentation"/);
+    assert.match(docs, /<main id="documentation" tabindex="-1">/);
+    assert.match(docsCss, /:focus-visible/);
+    assert.match(docsCss, /@media\(prefers-reduced-motion:reduce\)/);
+    assert.match(docsCss, /@media\(forced-colors:active\)/);
   });
 });
