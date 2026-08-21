@@ -43,7 +43,7 @@ const report = await scanFocusPath("https://example.com", {
 const html = generateHtmlReport(report);
 ```
 
-The scanner currently targets Chromium. `maxSteps` limits observable report entries; `maxTabPresses` counts every Tab key press, including movement inside opaque hosts. Cross-origin frames and detectable closed shadow roots use the independent `maxOpaqueTabPresses` budget. The report exposes the effective limits and an exact stop reason. Computed outline and shadow values are recorded for manual review; FocusPath does not claim to automatically verify WCAG focus appearance.
+The scanner currently targets Chromium. `maxSteps` limits observable report entries; `maxTabPresses` counts every Tab key press, including movement inside opaque hosts. Cross-origin frames and closed shadow roots inferred from repeated, uncanceled Tab movement use the independent `maxOpaqueTabPresses` budget. Canceled Tab events that leave focus in place are reported as stalled focus. The report exposes the effective limits and an exact stop reason. Computed outline and shadow values are recorded for manual review; FocusPath does not claim to automatically verify WCAG focus appearance.
 
 Repository, documentation, and issue tracker: [github.com/damianociarla/focuspath](https://github.com/damianociarla/focuspath)
 

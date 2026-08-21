@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.3
+
+- Report canceled Tab events as stalled focus instead of inferring a closed shadow root.
+- Correct the documented TypeScript report export and verify the public API example in tests.
+- Prevent horizontal overflow in the mobile documentation layout and cover it in Chromium.
+
 ## 0.3.2
 
 - Infer closed shadow roots only after repeated focus, preserving deterministic findings on ordinary custom elements.

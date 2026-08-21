@@ -20,7 +20,7 @@ npx focuspath https://example.com
 
 ## Scope and limitations
 
-FocusPath is an early diagnostic tool, not a WCAG conformance test. It currently runs Chromium and follows forward `Tab` navigation. Cross-origin iframes are represented as opaque hosts; closed shadow roots are inferred only when repeated focus makes them observable. Their internal controls cannot be inspected. Traversal is bounded separately by observable stops, total Tab presses, and repeated presses within one opaque host. Dynamic interfaces, platform-specific widgets, reverse navigation, and focus appearance still require manual and cross-browser testing.
+FocusPath is an early diagnostic tool, not a WCAG conformance test. It currently runs Chromium and follows forward `Tab` navigation. Cross-origin iframes are represented as opaque hosts; closed shadow roots are inferred only when repeated, uncanceled Tab movement makes them observable. A canceled Tab event that leaves focus in place is reported as stalled focus. Internal opaque controls cannot be inspected. Traversal is bounded separately by observable stops, total Tab presses, and repeated presses within one opaque host. Dynamic interfaces, platform-specific widgets, reverse navigation, and focus appearance still require manual and cross-browser testing.
 
 ## Usage
 
