@@ -1,4 +1,4 @@
-import { chromium, type Browser, type CDPSession, type Page } from "playwright";
+import { chromium, errors as playwrightErrors, type Browser, type CDPSession, type Page } from "playwright";
 import type { FocusIssue, FocusRect, FocusReport, FocusStep, ScanOptions, VisualEvidence } from "./types.js";
 
 const DEFAULT_VIEWPORT = { width: 1440, height: 900 };
@@ -308,6 +308,11 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
 
   try {
     return await Promise.race([deadline, scan()]);
+  } catch (error) {
+    if (timedOut || error instanceof playwrightErrors.TimeoutError || Date.now() - startedAt >= timeoutMs) {
+      throw new ScanTimeoutError(timeoutMs);
+    }
+    throw error;
   } finally {
     if (timeout) clearTimeout(timeout);
     await Promise.race([
