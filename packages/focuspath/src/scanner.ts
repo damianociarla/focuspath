@@ -1,5 +1,5 @@
-import { chromium, type Browser, type CDPSession, type Page } from "playwright";
-import type { FocusIssue, FocusReport, FocusStep, ScanOptions } from "./types.js";
+import { chromium, errors as playwrightErrors, type Browser, type CDPSession, type Page } from "playwright";
+import type { FocusIssue, FocusRect, FocusReport, FocusStep, ScanOptions, VisualEvidence } from "./types.js";
 
 const DEFAULT_VIEWPORT = { width: 1440, height: 900 };
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -28,9 +28,12 @@ const DEEPEST_ACTIVE_ELEMENT_EXPRESSION = `(() => {
 
 type ObservedFocusStep = FocusStep & {
   identity: string;
+  backendNodeId: number;
   confirmedOpaqueHost: boolean;
   opaqueCandidate: boolean;
 };
+
+type NodeGeometry = { rect: FocusRect; quad: number[] };
 
 export class ScanTimeoutError extends Error {
   constructor(timeoutMs: number) {
@@ -71,12 +74,22 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
   });
 
   const scan = async (): Promise<FocusReport> => {
-    browser = await chromium.launch({ headless: options.headless ?? true });
+    browser = await chromium.launch({
+      headless: options.headless ?? true,
+      ...(options.proxyServer ? {
+        proxy: { server: options.proxyServer },
+        args: [
+          "--disable-quic",
+          "--proxy-bypass-list=<-loopback>",
+          "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+        ],
+      } : {}),
+    });
     if (timedOut) {
       await closeBrowser();
       throw new ScanTimeoutError(timeoutMs);
     }
-    const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
+    const page = await browser.newPage({ viewport, deviceScaleFactor: 1, serviceWorkers: "block" });
     await page.addInitScript(() => {
       const state = window as Window & { __focusPathTabCanceled?: boolean };
       const defer = window.setTimeout.bind(window);
@@ -124,6 +137,7 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
     });
 
     const steps: FocusStep[] = [];
+    const backendNodeIds: number[] = [];
     const issues: FocusIssue[] = [];
     const seen = new Map<string, number>();
     let stoppedBecause: FocusReport["stoppedBecause"] = "step-limit";
@@ -213,13 +227,14 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
         break;
       }
 
-      const { identity, confirmedOpaqueHost, opaqueCandidate, ...step } = observed;
+      const { identity, backendNodeId, confirmedOpaqueHost, opaqueCandidate, ...step } = observed;
       seen.set(identity, step.index);
       previousIdentity = identity;
       previousWasConfirmedOpaque = confirmedOpaqueHost;
       previousWasOpaqueCandidate = opaqueCandidate;
       opaqueTabCount = 0;
       steps.push(step);
+      backendNodeIds.push(backendNodeId);
       issues.push(...issuesFor(step));
       if (confirmedOpaqueHost) {
         issues.push({
@@ -236,7 +251,15 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
       stoppedBecause = "tab-press-limit";
     }
 
-    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.evaluate(async () => {
+      const root = document.documentElement;
+      const scrollBehavior = root.style.scrollBehavior;
+      root.style.scrollBehavior = "auto";
+      window.scrollTo(0, 0);
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      root.style.scrollBehavior = scrollBehavior;
+    });
+    const finalGeometry = await Promise.all(backendNodeIds.map((backendNodeId) => readNodeGeometry(cdp, backendNodeId)));
     const metadata = await page.evaluate(() => ({
         title: document.title,
         width: Math.max(document.documentElement.scrollWidth, document.body?.scrollWidth ?? 0),
@@ -250,6 +273,16 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
       quality: 78,
     });
     const capturedImage = jpegDimensions(screenshot) ?? { width: captureWidth, height: captureHeight };
+    const finalSteps = steps.map((step, index) => {
+      const geometry = finalGeometry[index];
+      const nextStep: FocusStep = geometry
+        ? { ...step, observedRect: step.rect, rect: geometry.rect, quad: geometry.quad }
+        : { ...step, observedRect: step.rect };
+      return {
+        ...nextStep,
+        visualEvidence: classifyVisualEvidence(nextStep, capturedImage, geometry !== null),
+      };
+    });
 
     return {
       version: 2,
@@ -266,7 +299,7 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
       // was requested. Report the pixels that actually exist so the overlay
       // can never extend into fabricated blank space.
       document: capturedImage,
-      steps,
+      steps: finalSteps,
       issues,
       screenshot: `data:image/jpeg;base64,${screenshot.toString("base64")}`,
       stoppedBecause,
@@ -275,6 +308,11 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
 
   try {
     return await Promise.race([deadline, scan()]);
+  } catch (error) {
+    if (timedOut || error instanceof playwrightErrors.TimeoutError || Date.now() - startedAt >= timeoutMs) {
+      throw new ScanTimeoutError(timeoutMs);
+    }
+    throw error;
   } finally {
     if (timeout) clearTimeout(timeout);
     await Promise.race([
@@ -404,11 +442,15 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
   let accessibleName = "";
   let computedRole = "";
   let elementIdentity = "";
+  let backendNodeId = 0;
+  let observedGeometry: NodeGeometry | null = null;
   try {
     const active = await cdp.send("Runtime.evaluate", { expression: DEEPEST_ACTIVE_ELEMENT_EXPRESSION, objectGroup: "focuspath" });
     if (active.result.objectId) {
       const described = await cdp.send("DOM.describeNode", { objectId: active.result.objectId });
-      elementIdentity = `backend-node:${described.node.backendNodeId}`;
+      backendNodeId = described.node.backendNodeId;
+      elementIdentity = `backend-node:${backendNodeId}`;
+      observedGeometry = await readNodeGeometry(cdp, backendNodeId);
       const tree = await cdp.send("Accessibility.getPartialAXTree", { objectId: active.result.objectId, fetchRelatives: false });
       accessibleName = String(tree.nodes[0]?.name?.value ?? "").trim();
       computedRole = String(tree.nodes[0]?.role?.value ?? "").trim();
@@ -417,7 +459,7 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
     await cdp.send("Runtime.releaseObjectGroup", { objectGroup: "focuspath" });
   }
 
-  return page.evaluate(({ stepIndex, computedName, accessibilityRole, identity }) => {
+  return page.evaluate(({ stepIndex, computedName, accessibilityRole, identity, nodeId, geometry }) => {
     let element = document.activeElement;
     let confirmedOpaqueHost = false;
     let opaqueCandidate = false;
@@ -453,7 +495,7 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
     const focused = element as HTMLElement;
 
     const selector = uniqueSelector(focused);
-    const rect = absoluteRect(focused);
+    const rect = geometry?.rect ?? absoluteRect(focused);
     const scrollContexts = collectScrollContexts(focused);
     const styles = focused.ownerDocument.defaultView?.getComputedStyle(focused) ?? getComputedStyle(focused);
     const tagName = focused.tagName.toLowerCase();
@@ -469,6 +511,7 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
     return {
       index: stepIndex,
       identity,
+      backendNodeId: nodeId,
       selector,
       tagName,
       role: accessibilityRole || explicitRole || implicitRoles[tagName] || null,
@@ -481,6 +524,7 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
         width: Math.round(rect.width),
         height: Math.round(rect.height),
       },
+      ...(geometry ? { quad: geometry.quad } : {}),
       focusIndicator: {
         outline: `${styles.outlineWidth} ${styles.outlineStyle} ${styles.outlineColor}`,
         boxShadow: styles.boxShadow,
@@ -574,8 +618,8 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
     function isScrollableElement(node: HTMLElement): boolean {
       const view = node.ownerDocument.defaultView;
       const styles = view?.getComputedStyle(node) ?? getComputedStyle(node);
-      const scrollsX = /(auto|scroll|overlay)/.test(styles.overflowX) && node.scrollWidth > node.clientWidth;
-      const scrollsY = /(auto|scroll|overlay)/.test(styles.overflowY) && node.scrollHeight > node.clientHeight;
+      const scrollsX = /(auto|scroll|overlay|hidden|clip)/.test(styles.overflowX) && node.scrollWidth > node.clientWidth;
+      const scrollsY = /(auto|scroll|overlay|hidden|clip)/.test(styles.overflowY) && node.scrollHeight > node.clientHeight;
       return scrollsX || scrollsY;
     }
 
@@ -615,5 +659,57 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
       }
       return `${prefix}${parts.join(" > ")}`;
     }
-  }, { stepIndex: index, computedName: accessibleName.slice(0, 160), accessibilityRole: computedRole, identity: elementIdentity });
+  }, {
+    stepIndex: index,
+    computedName: accessibleName.slice(0, 160),
+    accessibilityRole: computedRole,
+    identity: elementIdentity,
+    nodeId: backendNodeId,
+    geometry: observedGeometry,
+  });
+}
+
+async function readNodeGeometry(cdp: CDPSession, backendNodeId: number): Promise<NodeGeometry | null> {
+  if (!backendNodeId) return null;
+  try {
+    const { model } = await cdp.send("DOM.getBoxModel", { backendNodeId });
+    const quad = model.border.map((value) => Math.round(value * 100) / 100);
+    if (quad.length !== 8 || quad.some((value) => !Number.isFinite(value))) return null;
+    const xs = [quad[0]!, quad[2]!, quad[4]!, quad[6]!];
+    const ys = [quad[1]!, quad[3]!, quad[5]!, quad[7]!];
+    const left = Math.min(...xs);
+    const top = Math.min(...ys);
+    const right = Math.max(...xs);
+    const bottom = Math.max(...ys);
+    return {
+      quad,
+      rect: {
+        x: left,
+        y: top,
+        width: Math.round((right - left) * 100) / 100,
+        height: Math.round((bottom - top) * 100) / 100,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+function classifyVisualEvidence(
+  step: FocusStep,
+  capture: { width: number; height: number },
+  geometryAvailable: boolean,
+): VisualEvidence {
+  if ((step.scrollContexts?.length ?? 0) > 0 || step.scrollContext) {
+    return { status: "sequence-only", reason: "scroll-or-clipping-context" };
+  }
+  if (!geometryAvailable) return { status: "sequence-only", reason: "geometry-unavailable" };
+
+  const left = step.rect.x;
+  const top = step.rect.y;
+  const right = left + step.rect.width;
+  const bottom = top + step.rect.height;
+  if (right <= 0 || bottom <= 0 || left >= capture.width || top >= capture.height) return { status: "outside-capture" };
+  if (left < 0 || top < 0 || right > capture.width || bottom > capture.height) return { status: "partially-visible" };
+  return { status: "plotted" };
 }

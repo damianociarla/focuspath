@@ -1,6 +1,8 @@
 import { lookup } from "node:dns/promises";
 import ipaddr from "ipaddr.js";
 
+export type AddressResolver = (hostname: string) => Promise<Array<{ address: string }>>;
+
 const BLOCKED_HOST_SUFFIXES = [".localhost", ".local", ".internal", ".home.arpa"];
 const BLOCKED_HOSTS = new Set([
   "localhost",
@@ -19,30 +21,40 @@ export class UnsafeUrlError extends Error {
 
 export function createPublicUrlPolicy(): (value: string) => Promise<boolean> {
   return async (value: string): Promise<boolean> => {
-    let url: URL;
     try {
-      url = new URL(value);
+      await resolvePublicTarget(value);
+      return true;
     } catch {
       return false;
     }
-
-    if (!["http:", "https:"].includes(url.protocol)) return false;
-    if (url.username || url.password) return false;
-    if (url.port && !["80", "443"].includes(url.port)) return false;
-
-    const hostname = url.hostname.toLowerCase().replace(/\.$/, "");
-    if (!hostname || BLOCKED_HOSTS.has(hostname) || BLOCKED_HOST_SUFFIXES.some((suffix) => hostname.endsWith(suffix))) return false;
-    // Resolve every request instead of trusting an earlier result for the hostname.
-    // Infrastructure-level egress filtering is still required to fully close DNS rebinding TOCTOU.
-    return resolvesOnlyToPublicAddresses(hostname);
   };
 }
 
 export async function assertPublicUrl(value: string): Promise<URL> {
   const url = parseHttpUrl(value);
-  const policy = createPublicUrlPolicy();
-  if (!(await policy(url.toString()))) throw new UnsafeUrlError();
+  await resolvePublicTarget(url.toString());
   return url;
+}
+
+export async function resolvePublicTarget(
+  value: string,
+  resolver: AddressResolver = systemResolver,
+): Promise<{ url: URL; addresses: string[] }> {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new UnsafeUrlError();
+  }
+  if (!["http:", "https:"].includes(url.protocol)) throw new UnsafeUrlError();
+  if (url.username || url.password) throw new UnsafeUrlError();
+  if (url.port && !["80", "443"].includes(url.port)) throw new UnsafeUrlError();
+
+  const hostname = normalizeHostname(url.hostname);
+  if (!hostname || BLOCKED_HOSTS.has(hostname) || BLOCKED_HOST_SUFFIXES.some((suffix) => hostname.endsWith(suffix))) throw new UnsafeUrlError();
+  const addresses = await resolvePublicAddresses(hostname, resolver);
+  if (addresses.length === 0 || addresses.some((address) => !isPublicAddress(address))) throw new UnsafeUrlError();
+  return { url, addresses };
 }
 
 export function parseHttpUrl(value: string): URL {
@@ -57,15 +69,22 @@ export function parseHttpUrl(value: string): URL {
   return url;
 }
 
-async function resolvesOnlyToPublicAddresses(hostname: string): Promise<boolean> {
-  if (ipaddr.isValid(hostname)) return isPublicAddress(hostname);
-
+async function resolvePublicAddresses(hostname: string, resolver: AddressResolver): Promise<string[]> {
+  if (ipaddr.isValid(hostname)) return [hostname];
   try {
-    const addresses = await lookup(hostname, { all: true, verbatim: true });
-    return addresses.length > 0 && addresses.every(({ address }) => isPublicAddress(address));
+    return (await resolver(hostname)).map(({ address }) => address);
   } catch {
-    return false;
+    return [];
   }
+}
+
+const systemResolver: AddressResolver = (hostname) => lookup(hostname, { all: true, verbatim: true });
+
+function normalizeHostname(hostname: string): string {
+  const normalized = hostname.toLowerCase().replace(/\.$/, "");
+  return normalized.startsWith("[") && normalized.endsWith("]")
+    ? normalized.slice(1, -1)
+    : normalized;
 }
 
 export function isPublicAddress(value: string): boolean {

@@ -31,7 +31,7 @@
 
     <main id="documentation" tabindex="-1">
       <section class="docs-hero" aria-labelledby="docs-title">
-        <div><p class="eyebrow">Documentation / v0.4.3</p><h1 id="docs-title">Map the route.<br /><em>Keep the evidence.</em></h1></div>
+        <div><p class="eyebrow">Documentation / v0.4.4</p><h1 id="docs-title">Map the route.<br /><em>Keep the evidence.</em></h1></div>
         <div class="hero-note"><p>FocusPath follows Tab or Shift+Tab navigation in a real Chromium session, records observable focus stops, and produces a portable HTML report.</p><div><a class="action" href="#install">Install</a><a href="https://github.com/damianociarla/focuspath/blob/main/docs/openapi.yml">OpenAPI ↗</a></div></div>
       </section>
 
@@ -72,8 +72,9 @@ const html = generateHtmlReport(report);</code></pre>
             <h3>Opaque boundaries</h3>
             <p>Cross-origin iframes are known to be opaque. A custom element without an open shadow root is only treated as a candidate; FocusPath infers a closed shadow root only when repeated, uncanceled Tab presses keep focus on that host. A canceled Tab event is reported as stalled focus instead. Internal controls cannot be named or positioned, but traversal may continue within the independent Tab budget.</p>
             <p>FocusPath detects missing accessible names, generic roles, positive <code>tabindex</code>, cycles and stalled focus. Element identity comes from Chromium rather than the display selector, so similar deep DOM branches remain distinct.</p>
-            <h3>Scrollable containers</h3>
-            <p>A final screenshot cannot truthfully represent every intermediate scroll position. FocusPath follows scrollable ancestors across open shadow roots and same-origin iframe boundaries, including nested iframe viewports and parent-page scrollers. A stop can expose multiple <code>scrollContexts</code>; it remains in the ordered table with every recorded scroll state, but is intentionally omitted from the screenshot overlay. FocusPath is evidence for review—not a WCAG certification.</p>
+            <h3>Visual evidence</h3>
+            <p>A final screenshot cannot truthfully represent every intermediate scroll position. FocusPath follows scrolling and clipping ancestors—including <code>overflow:hidden</code>, <code>overflow:clip</code>, same-origin iframe viewports and parent-page scrollers. A stop can expose multiple <code>scrollContexts</code> and a <code>visualEvidence</code> status: <code>plotted</code>, <code>partially-visible</code>, <code>outside-capture</code> or <code>sequence-only</code>.</p>
+            <p>Traversal-time geometry remains available as <code>observedRect</code>. Before the screenshot, FocusPath returns the page to its final capture state and asks Chromium for the border <code>quad</code> again. This keeps sticky controls and CSS-transformed iframe contents aligned with the image. Sequence-only steps remain in the ordered table but are omitted from the overlay. FocusPath is evidence for review—not a WCAG certification.</p>
           </section>
 
           <section id="http-api" aria-labelledby="http-title">
@@ -89,7 +90,7 @@ Content-Type: application/json
           <section id="security" aria-labelledby="security-title">
             <p class="section-number">05 / Boundaries</p><h2 id="security-title">Security and privacy</h2>
             <p>Only scan pages you are authorized to test. The submitted URL is fetched in a temporary Chromium session on AWS. FocusPath does not intentionally persist page content, screenshots or generated reports after the response completes.</p>
-            <ul class="plain-list"><li>Infrastructure providers may retain request metadata in operational logs according to their configured retention.</li><li>Private, loopback, link-local and cloud-metadata destinations are rejected, including redirects and browser subrequests.</li><li>Network-layer egress isolation is not yet a substitute for application checks and remains a documented hardening opportunity.</li><li>The optional AWS WAF layer is intentionally disabled in the low-cost deployment.</li></ul>
+            <ul class="plain-list"><li>Infrastructure providers may retain request metadata in operational logs according to their configured retention.</li><li>Private, loopback, link-local and cloud-metadata destinations are rejected, including redirects and browser subrequests.</li><li>The hosted browser uses a local egress proxy that resolves each target once and connects directly to that validated public IP, preventing Chromium from performing a second DNS lookup.</li><li>Infrastructure-level egress filtering remains recommended defense in depth before operating a general-purpose service.</li><li>The optional AWS WAF layer is intentionally disabled in the low-cost deployment.</li></ul>
             <p class="fine-print">FocusPath scans one selected direction at a time and does not compare both routes automatically. It cannot cover every browser, assistive technology, focus-indicator contrast or interaction state. Pair the report with manual keyboard and screen-reader testing.</p>
           </section>
         </article>

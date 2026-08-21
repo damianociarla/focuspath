@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FocusPath Live Scanner API
-  version: 0.4.3
+  version: 0.4.4
   description: Rate-limited public demo API; not a general-purpose scanning service.
 paths:
   /health:
@@ -96,6 +96,16 @@ components:
         tabIndex: { type: integer }
         href: { type: [string, "null"], format: uri }
         rect: { $ref: "#/components/schemas/Rect" }
+        observedRect:
+          description: Geometry when traversal reached the element, before the page is reset for the final screenshot.
+          $ref: "#/components/schemas/Rect"
+        quad:
+          type: array
+          description: Four final border-box points in screenshot coordinates, preserving CSS transforms.
+          minItems: 8
+          maxItems: 8
+          items: { type: number }
+        visualEvidence: { $ref: "#/components/schemas/VisualEvidence" }
         focusIndicator: { $ref: "#/components/schemas/FocusStyles" }
         scrollContexts:
           type: array
@@ -121,6 +131,17 @@ components:
       properties:
         outline: { type: string }
         boxShadow: { type: string }
+    VisualEvidence:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [plotted, partially-visible, outside-capture, sequence-only]
+        reason:
+          type: string
+          enum: [scroll-or-clipping-context, geometry-unavailable]
     ScrollContext:
       type: object
       additionalProperties: false

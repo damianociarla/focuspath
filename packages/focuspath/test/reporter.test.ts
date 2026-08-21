@@ -69,7 +69,7 @@ describe("reporter", () => {
 
     const html = generateHtmlReport(report);
     expect(html).not.toContain("<g class=\"focus-node\">");
-    expect(html).toContain("<strong>1 step is sequence-only.</strong>");
+    expect(html).toContain("<strong>1 step is omitted from the overlay.</strong>");
     expect(html).toContain("Sequence only — element #scroller at scroll 0, 70");
     expect(html).toContain("<th scope=\"col\">Visual evidence</th>");
 
@@ -106,7 +106,42 @@ describe("reporter", () => {
     const html = generateHtmlReport(report);
     expect(html.match(/<g class="focus-node">/g)).toHaveLength(1);
     expect(html).not.toContain("y2=\"920\"");
-    expect(html).toContain("Sequence only — outside the captured screenshot");
-    expect(html).toContain("<strong>1 step is sequence-only.</strong>");
+    expect(html).toContain("Outside captured screenshot");
+    expect(html).toContain("<strong>1 step is omitted from the overlay.</strong>");
+  });
+
+  it("renders transformed geometry as a polygon", () => {
+    const report: FocusReport = {
+      version: 2,
+      direction: "forward",
+      url: "https://example.com/",
+      title: "Transformed frame",
+      scannedAt: "2026-08-21T00:00:00.000Z",
+      durationMs: 80,
+      tabPressCount: 2,
+      limits: { maxSteps: 50, maxTabPresses: 200, maxOpaqueTabPresses: 100 },
+      viewport: { width: 800, height: 500 },
+      document: { width: 800, height: 500 },
+      screenshot: "data:image/jpeg;base64,test",
+      stoppedBecause: "document-exhausted",
+      steps: [{
+        index: 1,
+        selector: "#frame >>> #inside",
+        tagName: "button",
+        role: "button",
+        accessibleName: "Inside",
+        tabIndex: 0,
+        href: null,
+        rect: { x: 10, y: 10, width: 55, height: 30 },
+        quad: [10, 10, 60, 14, 58, 34, 8, 30],
+        visualEvidence: { status: "plotted" },
+        focusIndicator: { outline: "2px solid black", boxShadow: "none" },
+      }],
+      issues: [],
+    };
+
+    const html = generateHtmlReport(report);
+    expect(html).toContain('<polygon points="10,10 60,14 58,34 8,30"/>');
+    expect(html).not.toContain("<rect x=\"10\"");
   });
 });

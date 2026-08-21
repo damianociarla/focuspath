@@ -15,6 +15,20 @@ export interface ScrollContext {
   scrollTop: number;
 }
 
+export interface FocusRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export type VisualEvidenceStatus = "plotted" | "partially-visible" | "outside-capture" | "sequence-only";
+
+export interface VisualEvidence {
+  status: VisualEvidenceStatus;
+  reason?: "scroll-or-clipping-context" | "geometry-unavailable";
+}
+
 export interface FocusStep {
   index: number;
   selector: string;
@@ -23,12 +37,14 @@ export interface FocusStep {
   accessibleName: string;
   tabIndex: number;
   href: string | null;
-  rect: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
+  /** Geometry in the final screenshot state. */
+  rect: FocusRect;
+  /** Geometry at the moment focus reached the element. */
+  observedRect?: FocusRect;
+  /** Final border quad in screenshot coordinates, including CSS transforms. */
+  quad?: number[];
+  /** Whether and how this step is represented by the final screenshot. */
+  visualEvidence?: VisualEvidence;
   focusIndicator: {
     outline: string;
     boxShadow: string;
@@ -86,4 +102,6 @@ export interface ScanOptions {
   maxScreenshotHeight?: number;
   /** Return false to block a main-frame or subresource URL before the browser requests it. */
   isUrlAllowed?: (url: string) => boolean | Promise<boolean>;
+  /** Optional HTTP proxy used for every Chromium network connection. */
+  proxyServer?: string;
 }

@@ -60,12 +60,12 @@ gh workflow run pages.yml --repo damianociarla/focuspath
 
 ## Production hardening
 
-The API restricts URLs, revalidates browser requests, runs as a non-root user, limits body size, scan duration, concurrency, network requests, expensive resource types, screenshot height and requests per client/target/hour. Before promoting it beyond beta:
+The API restricts URLs, pins browser connections to DNS-validated public IPs through a loopback egress proxy, runs as a non-root user, limits body size, scan duration, concurrency, network requests, expensive resource types, screenshot height and requests per client/target/hour. Before promoting it beyond beta:
 
 - Keep the CloudFront Free plan WAF and bot protection enabled.
 - Move rate limits to DynamoDB or another shared store before raising App Runner above one instance.
 - Use SQS and isolated ECS Fargate tasks for scan execution.
-- Restrict egress through a filtering proxy if scanning fully untrusted sites.
+- Add infrastructure-enforced egress filtering as defense in depth for fully untrusted, general-purpose scanning.
 - Store reports in an S3 bucket with short expiry and server-side encryption.
 - Add CloudWatch alarms for latency, errors, throttling and unexpected browser duration.
 - Keep the App Runner instance role empty; the scanner does not need AWS credentials.
