@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { generateHtmlReport, scanFocusPath } from "focuspath";
-import { assertPublicUrl, createPublicUrlPolicy, UnsafeUrlError } from "./network-policy.js";
+import { generateHtmlReport, ScanTimeoutError, scanFocusPath } from "focuspath";
+import { assertPublicUrl, createPublicUrlPolicy, parseHttpUrl, UnsafeUrlError } from "./network-policy.js";
 import { clientAddress, hasValidOriginToken, SlidingWindowLimiter } from "./security.js";
 
 const port = Number(process.env.PORT ?? 8787);
@@ -58,13 +58,6 @@ const server = createServer(async (request, response) => {
     return;
   }
 
-  const client = clientAddress(request);
-  if (!clientLimiter.consume(client)) {
-    response.setHeader("retry-after", "600");
-    json(response, 429, { error: "Scan limit reached. Try again in a few minutes." });
-    return;
-  }
-
   if (activeScans >= maxConcurrentScans) {
     response.setHeader("retry-after", "15");
     json(response, 503, { error: "All scanners are busy. Try again shortly." });
@@ -74,7 +67,18 @@ const server = createServer(async (request, response) => {
   let acquiredScanSlot = false;
   try {
     const body = await readJsonBody(request);
+    if (Object.keys(body).some((key) => key !== "url")) throw new UnsafeUrlError("Request body must contain only a URL.");
     const submitted = typeof body.url === "string" ? body.url.trim() : "";
+    if (submitted.length > 2_048) throw new UnsafeUrlError("The URL must be at most 2048 characters.");
+    parseHttpUrl(submitted);
+
+    const client = clientAddress(request);
+    if (!clientLimiter.consume(client)) {
+      response.setHeader("retry-after", "600");
+      json(response, 429, { error: "Scan limit reached. Try again in a few minutes." });
+      return;
+    }
+
     const url = await assertPublicUrl(submitted);
 
     if (!globalLimiter.consume("all")) {
@@ -116,6 +120,7 @@ const server = createServer(async (request, response) => {
   } catch (error) {
     if (error instanceof UnsafeUrlError) json(response, 400, { error: error.message });
     else if (error instanceof SyntaxError) json(response, 400, { error: "Invalid JSON request." });
+    else if (error instanceof ScanTimeoutError) json(response, 504, { error: "The scan reached its time limit. Try a smaller or faster page." });
     else {
       console.error(error);
       json(response, 502, { error: "The page could not be scanned. It may block automated browsers or take too long to load." });

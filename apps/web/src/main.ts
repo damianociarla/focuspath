@@ -33,7 +33,7 @@ for (const button of document.querySelectorAll<HTMLButtonElement>("[data-copy-co
 
 const findings: Record<string, { title: string; code: string; copy: string }> = {
   "1": { title: "Clear navigation landmark", code: "nav[aria-label='Primary']", copy: "The first stop is named and follows the visual reading order." },
-  "2": { title: "Visible focus indicator", code: "a.primary-action", copy: "A high-contrast outline remains visible against the page surface." },
+  "2": { title: "Computed focus style", code: "a.primary-action", copy: "Outline and shadow values are preserved as evidence for manual review." },
   "3": { title: "Missing accessible name", code: "button.icon-only", copy: "Focusable control cannot be identified by assistive technology." },
   "4": { title: "Natural document order", code: "a.footer-link", copy: "The final stop completes the page without a positive tabindex override." },
 };
@@ -104,7 +104,11 @@ scanForm?.addEventListener("submit", async (event) => {
       body: JSON.stringify({ url: input.value }),
     });
     const payload = await response.json() as ScanResponse | { error?: string };
-    if (!response.ok || !("reportHtml" in payload)) throw new Error("error" in payload ? payload.error : "The scan could not be completed.");
+    if (!response.ok || !("reportHtml" in payload)) {
+      const retryAfter = Number(response.headers.get("retry-after"));
+      const retryCopy = Number.isFinite(retryAfter) && retryAfter > 0 ? ` You can retry in ${formatRetryAfter(retryAfter)}.` : "";
+      throw new Error(`${"error" in payload ? payload.error : "The scan could not be completed."}${retryCopy}`);
+    }
     showScanResult(payload);
     moveFocusFromButton(button, "[data-result-title]");
   } catch (error) {
@@ -135,6 +139,12 @@ function setScanState(state: "idle" | "progress" | "error" | "result", error = "
     setText("[data-scan-error-copy]", error);
     setText("[data-scan-elapsed]", "Stopped");
   }
+}
+
+function formatRetryAfter(seconds: number): string {
+  if (seconds < 60) return `${seconds} seconds`;
+  const minutes = Math.ceil(seconds / 60);
+  return minutes === 1 ? "1 minute" : `${minutes} minutes`;
 }
 
 function moveFocusFromButton(button: HTMLButtonElement | null, selector: string): void {

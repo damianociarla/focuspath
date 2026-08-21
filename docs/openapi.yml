@@ -1,0 +1,83 @@
+openapi: 3.1.0
+info:
+  title: FocusPath Live Scanner API
+  version: 0.2.0
+  description: Rate-limited public demo API; not a general-purpose scanning service.
+paths:
+  /health:
+    get:
+      summary: Check service readiness
+      responses:
+        "200":
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, activeScans]
+                properties:
+                  status: { const: ok }
+                  activeScans: { type: integer, minimum: 0 }
+  /v1/scans:
+    post:
+      summary: Scan one public web page
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [url]
+              properties:
+                url: { type: string, format: uri, maxLength: 2048 }
+      responses:
+        "200":
+          description: Scan completed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url, title, scannedAt, durationMs, stoppedBecause, steps, issues, reportHtml]
+                properties:
+                  url: { type: string, format: uri }
+                  title: { type: string }
+                  scannedAt: { type: string, format: date-time }
+                  durationMs: { type: integer, minimum: 0 }
+                  stoppedBecause:
+                    enum: [cycle-complete, step-limit, no-focusable-elements, document-exhausted, stalled-on-element]
+                  steps: { type: array, items: { type: object } }
+                  issues: { type: array, items: { type: object } }
+                  reportHtml: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+        "429": { $ref: "#/components/responses/Retryable" }
+        "502": { $ref: "#/components/responses/ScanFailed" }
+        "503": { $ref: "#/components/responses/Retryable" }
+        "504": { $ref: "#/components/responses/ScanFailed" }
+components:
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+  responses:
+    BadRequest:
+      description: Invalid JSON or unsafe URL
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Forbidden:
+      description: Browser origin is not allowed
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    UnsupportedMediaType:
+      description: Request must use application/json
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Retryable:
+      description: Rate or concurrency limit reached; inspect Retry-After
+      headers:
+        Retry-After: { schema: { type: integer }, description: Seconds before retrying }
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    ScanFailed:
+      description: Target navigation or scan failed
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }

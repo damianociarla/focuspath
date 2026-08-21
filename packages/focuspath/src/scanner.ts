@@ -1,7 +1,16 @@
-import { chromium } from "playwright";
+import { chromium, type Browser, type CDPSession, type Page } from "playwright";
 import type { FocusIssue, FocusReport, FocusStep, ScanOptions } from "./types.js";
 
 const DEFAULT_VIEWPORT = { width: 1440, height: 900 };
+const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_FOCUS_SETTLE_MS = 75;
+
+export class ScanTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`Scan exceeded the ${timeoutMs}ms time limit.`);
+    this.name = "ScanTimeoutError";
+  }
+}
 
 export async function scanFocusPath(url: string, options: ScanOptions = {}): Promise<FocusReport> {
   const startedAt = Date.now();
@@ -10,10 +19,20 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
   const maxRequests = options.maxRequests ?? Number.POSITIVE_INFINITY;
   const blockedResourceTypes = new Set(options.blockedResourceTypes ?? []);
   const maxScreenshotHeight = options.maxScreenshotHeight ?? Number.POSITIVE_INFINITY;
-  const browser = await chromium.launch({ headless: options.headless ?? true });
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const focusSettleMs = options.focusSettleMs ?? DEFAULT_FOCUS_SETTLE_MS;
+  let browser: Browser | undefined;
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    void browser?.close();
+  }, timeoutMs);
 
   try {
+    browser = await chromium.launch({ headless: options.headless ?? true });
+    if (timedOut) throw new ScanTimeoutError(timeoutMs);
     const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
+    const cdp = await page.context().newCDPSession(page);
     let requestCount = 0;
     if (options.isUrlAllowed || Number.isFinite(maxRequests) || blockedResourceTypes.size > 0) {
       await page.route("**/*", async (route) => {
@@ -33,7 +52,7 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
     }
     await page.goto(url, {
       waitUntil: "domcontentloaded",
-      timeout: options.timeoutMs ?? 30_000,
+      timeout: remainingTime(startedAt, timeoutMs),
     });
 
     await page.evaluate(() => {
@@ -44,16 +63,17 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
     const steps: FocusStep[] = [];
     const issues: FocusIssue[] = [];
     const seen = new Map<string, number>();
-    let stoppedBecause: FocusReport["stoppedBecause"] = "limit";
+    let stoppedBecause: FocusReport["stoppedBecause"] = "step-limit";
     let previousSelector = "";
 
     for (let index = 1; index <= maxSteps; index += 1) {
       await page.keyboard.press("Tab");
-      await page.waitForTimeout(35);
-      const step = await readActiveElement(page, index);
+      await settleFocus(page, focusSettleMs);
+      if (timedOut) throw new ScanTimeoutError(timeoutMs);
+      const step = await readActiveElement(page, cdp, index);
 
       if (!step) {
-        stoppedBecause = steps.length === 0 ? "no-focusable-elements" : "focus-stalled";
+        stoppedBecause = steps.length === 0 ? "no-focusable-elements" : "document-exhausted";
         break;
       }
 
@@ -65,12 +85,12 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
           selector: step.selector,
           message: "Focus did not move after pressing Tab.",
         });
-        stoppedBecause = "focus-stalled";
+        stoppedBecause = "stalled-on-element";
         break;
       }
 
       if (seen.has(step.selector)) {
-        stoppedBecause = "cycle";
+        stoppedBecause = "cycle-complete";
         break;
       }
 
@@ -107,9 +127,37 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
       screenshot: `data:image/jpeg;base64,${screenshot.toString("base64")}`,
       stoppedBecause,
     };
+  } catch (error) {
+    if (timedOut && !(error instanceof ScanTimeoutError)) throw new ScanTimeoutError(timeoutMs);
+    throw error;
   } finally {
-    await browser.close();
+    clearTimeout(timeout);
+    await browser?.close().catch(() => undefined);
   }
+}
+
+function remainingTime(startedAt: number, timeoutMs: number): number {
+  return Math.max(1, timeoutMs - (Date.now() - startedAt));
+}
+
+async function settleFocus(page: Page, delayMs: number): Promise<void> {
+  if (delayMs > 0) await page.waitForTimeout(delayMs);
+  await page.evaluate(() => new Promise<void>((resolve) => {
+    let previous = "";
+    let stableFrames = 0;
+    let sampledFrames = 0;
+    const sample = () => {
+      const element = document.activeElement;
+      const rect = element instanceof HTMLElement ? element.getBoundingClientRect() : null;
+      const current = rect ? [rect.x, rect.y, rect.width, rect.height].map((value) => value.toFixed(2)).join(":") : "none";
+      stableFrames = current === previous ? stableFrames + 1 : 0;
+      previous = current;
+      sampledFrames += 1;
+      if (stableFrames >= 2 || sampledFrames >= 8) resolve();
+      else requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  }));
 }
 
 function issuesFor(step: FocusStep): FocusIssue[] {
@@ -122,7 +170,7 @@ function issuesFor(step: FocusStep): FocusIssue[] {
       severity: "error",
       step: step.index,
       selector: step.selector,
-      message: "Focusable control has no detectable accessible name.",
+      message: "Focusable control has no computed accessible name.",
     });
   }
 
@@ -139,8 +187,21 @@ function issuesFor(step: FocusStep): FocusIssue[] {
   return issues;
 }
 
-async function readActiveElement(page: import("playwright").Page, index: number): Promise<FocusStep | null> {
-  return page.evaluate((stepIndex) => {
+async function readActiveElement(page: Page, cdp: CDPSession, index: number): Promise<FocusStep | null> {
+  let accessibleName = "";
+  let computedRole = "";
+  try {
+    const active = await cdp.send("Runtime.evaluate", { expression: "document.activeElement", objectGroup: "focuspath" });
+    if (active.result.objectId) {
+      const tree = await cdp.send("Accessibility.getPartialAXTree", { objectId: active.result.objectId, fetchRelatives: false });
+      accessibleName = String(tree.nodes[0]?.name?.value ?? "").trim();
+      computedRole = String(tree.nodes[0]?.role?.value ?? "").trim();
+    }
+  } finally {
+    await cdp.send("Runtime.releaseObjectGroup", { objectGroup: "focuspath" });
+  }
+
+  return page.evaluate(({ stepIndex, computedName, accessibilityRole }) => {
     const element = document.activeElement;
     if (!(element instanceof HTMLElement) || element === document.body || element === document.documentElement) return null;
 
@@ -161,8 +222,8 @@ async function readActiveElement(page: import("playwright").Page, index: number)
       index: stepIndex,
       selector,
       tagName,
-      role: explicitRole ?? implicitRoles[tagName] ?? null,
-      accessibleName: getAccessibleName(element),
+      role: accessibilityRole || explicitRole || implicitRoles[tagName] || null,
+      accessibleName: computedName,
       tabIndex: element.tabIndex,
       href: element instanceof HTMLAnchorElement ? element.href : null,
       rect: {
@@ -176,29 +237,6 @@ async function readActiveElement(page: import("playwright").Page, index: number)
         boxShadow: styles.boxShadow,
       },
     };
-
-    function getAccessibleName(node: HTMLElement): string {
-      const labelledBy = node.getAttribute("aria-labelledby");
-      if (labelledBy) {
-        const value = labelledBy
-          .split(/\s+/)
-          .map((id) => document.getElementById(id)?.textContent?.trim() ?? "")
-          .filter(Boolean)
-          .join(" ");
-        if (value) return value;
-      }
-
-      const ariaLabel = node.getAttribute("aria-label")?.trim();
-      if (ariaLabel) return ariaLabel;
-      if (node instanceof HTMLImageElement && node.alt.trim()) return node.alt.trim();
-      if (node instanceof HTMLInputElement) {
-        const labels = Array.from(node.labels ?? []).map((label) => label.textContent?.trim() ?? "").filter(Boolean);
-        if (labels.length) return labels.join(" ");
-        if (node.placeholder.trim()) return node.placeholder.trim();
-        if (["button", "submit", "reset"].includes(node.type) && node.value.trim()) return node.value.trim();
-      }
-      return (node.innerText || node.getAttribute("title") || "").trim().replace(/\s+/g, " ").slice(0, 160);
-    }
 
     function uniqueSelector(node: Element): string {
       if (node.id) return `#${CSS.escape(node.id)}`;
@@ -216,5 +254,5 @@ async function readActiveElement(page: import("playwright").Page, index: number)
       }
       return parts.join(" > ");
     }
-  }, index);
+  }, { stepIndex: index, computedName: accessibleName.slice(0, 160), accessibilityRole: computedRole });
 }

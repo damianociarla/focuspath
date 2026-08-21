@@ -39,13 +39,15 @@ export interface FocusReport {
   steps: FocusStep[];
   issues: FocusIssue[];
   screenshot: string;
-  stoppedBecause: "cycle" | "limit" | "no-focusable-elements" | "focus-stalled";
+  stoppedBecause: "cycle-complete" | "step-limit" | "no-focusable-elements" | "document-exhausted" | "stalled-on-element";
 }
 
 export interface ScanOptions {
   maxSteps?: number;
   viewport?: { width: number; height: number };
   timeoutMs?: number;
+  /** Delay after each Tab press before reading focus. Defaults to 75ms. */
+  focusSettleMs?: number;
   headless?: boolean;
   /** Maximum number of network requests made by the page. */
   maxRequests?: number;

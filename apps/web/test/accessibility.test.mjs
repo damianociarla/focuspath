@@ -29,4 +29,10 @@ describe("website accessibility contract", () => {
     assert.match(css, /outline:\s*3px/);
     assert.match(css, /@media\s*\(forced-colors:\s*active\)/);
   });
+
+  it("states privacy and automated-scan limitations next to the live scanner", () => {
+    assert.match(html, /<summary>Privacy and scan limitations<\/summary>/);
+    assert.match(html, /does not certify WCAG conformance/);
+    assert.match(html, /does not intentionally persist page content or reports/);
+  });
 });

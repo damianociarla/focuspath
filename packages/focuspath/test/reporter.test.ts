@@ -17,14 +17,14 @@ describe("reporter", () => {
       viewport: { width: 1000, height: 700 },
       document: { width: 1000, height: 1200 },
       screenshot: "data:image/jpeg;base64,test",
-      stoppedBecause: "cycle",
+      stoppedBecause: "cycle-complete",
       steps: [{ index: 1, selector: "button", tagName: "button", role: "button", accessibleName: "", tabIndex: 0, href: null, rect: { x: 20, y: 30, width: 100, height: 40 }, focusIndicator: { outline: "2px solid black", boxShadow: "none" } }],
-      issues: [{ kind: "missing-name", severity: "error", step: 1, selector: "button", message: "Focusable control has no detectable accessible name." }],
+      issues: [{ kind: "missing-name", severity: "error", step: 1, selector: "button", message: "Focusable control has no computed accessible name." }],
     };
 
     const html = generateHtmlReport(report);
     expect(html).toContain("FocusPath / Report");
-    expect(html).toContain("Focusable control has no detectable accessible name.");
+    expect(html).toContain("Focusable control has no computed accessible name.");
     expect(html).toContain("<circle cx=\"70\" cy=\"50\"");
     expect(html).toContain("Skip visual overview");
     expect(html).toContain("<caption class=\"sr-only\">Focus stops in keyboard traversal order</caption>");
