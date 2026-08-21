@@ -7,6 +7,14 @@ export interface TraversalLimits {
   maxOpaqueTabPresses: number;
 }
 
+export interface ScrollContext {
+  /** Element scroller or nested iframe viewport. Omitted values from v0.4.1 mean element. */
+  kind?: "element" | "viewport";
+  selector: string;
+  scrollLeft: number;
+  scrollTop: number;
+}
+
 export interface FocusStep {
   index: number;
   selector: string;
@@ -25,16 +33,10 @@ export interface FocusStep {
     outline: string;
     boxShadow: string;
   };
-  /**
-   * Present when browser focus scrolling changed an independently scrollable
-   * ancestor. These steps remain in the sequence but are not positioned over
-   * the final page screenshot, which represents a different scroll state.
-   */
-  scrollContext?: {
-    selector: string;
-    scrollLeft: number;
-    scrollTop: number;
-  };
+  /** Every independently scrolling or clipping context between this step and the top-level page. */
+  scrollContexts?: ScrollContext[];
+  /** @deprecated Use scrollContexts. Retained as the first context for v0.4.1 compatibility. */
+  scrollContext?: ScrollContext;
 }
 
 export interface FocusIssue {
