@@ -26,7 +26,11 @@ const DEEPEST_ACTIVE_ELEMENT_EXPRESSION = `(() => {
   return element;
 })()`;
 
-type ObservedFocusStep = FocusStep & { confirmedOpaqueHost: boolean; opaqueCandidate: boolean };
+type ObservedFocusStep = FocusStep & {
+  identity: string;
+  confirmedOpaqueHost: boolean;
+  opaqueCandidate: boolean;
+};
 
 export class ScanTimeoutError extends Error {
   constructor(timeoutMs: number) {
@@ -123,7 +127,7 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
     const issues: FocusIssue[] = [];
     const seen = new Map<string, number>();
     let stoppedBecause: FocusReport["stoppedBecause"] = "step-limit";
-    let previousSelector = "";
+    let previousIdentity = "";
     let previousWasConfirmedOpaque = false;
     let previousWasOpaqueCandidate = false;
     let opaqueTabCount = 0;
@@ -147,9 +151,9 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
         break;
       }
 
-      const repeatedSelector = observed.selector === previousSelector;
-      if (repeatedSelector && tabWasCanceled) {
-        const existingStep = seen.get(observed.selector) ?? Math.max(1, steps.length);
+      const repeatedElement = observed.identity === previousIdentity;
+      if (repeatedElement && tabWasCanceled) {
+        const existingStep = seen.get(observed.identity) ?? Math.max(1, steps.length);
         issues.push({
           kind: "focus-stalled",
           severity: "warning",
@@ -160,14 +164,14 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
         stoppedBecause = "stalled-on-element";
         break;
       }
-      const repeatedOpaqueHost = repeatedSelector && (
+      const repeatedOpaqueHost = repeatedElement && (
         previousWasConfirmedOpaque
         || observed.confirmedOpaqueHost
         || (previousWasOpaqueCandidate && observed.opaqueCandidate)
       );
 
       if (repeatedOpaqueHost) {
-        const hostStep = seen.get(observed.selector) ?? Math.max(1, steps.length);
+        const hostStep = seen.get(observed.identity) ?? Math.max(1, steps.length);
         if (!previousWasConfirmedOpaque) {
           previousWasConfirmedOpaque = true;
           issues.push({
@@ -191,8 +195,8 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
         break;
       }
 
-      if (repeatedSelector) {
-        const existingStep = seen.get(observed.selector) ?? Math.max(1, steps.length);
+      if (repeatedElement) {
+        const existingStep = seen.get(observed.identity) ?? Math.max(1, steps.length);
         issues.push({
           kind: "focus-stalled",
           severity: "warning",
@@ -204,14 +208,14 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
         break;
       }
 
-      if (seen.has(observed.selector)) {
+      if (seen.has(observed.identity)) {
         stoppedBecause = "cycle-complete";
         break;
       }
 
-      const { confirmedOpaqueHost, opaqueCandidate, ...step } = observed;
-      seen.set(step.selector, step.index);
-      previousSelector = step.selector;
+      const { identity, confirmedOpaqueHost, opaqueCandidate, ...step } = observed;
+      seen.set(identity, step.index);
+      previousIdentity = identity;
       previousWasConfirmedOpaque = confirmedOpaqueHost;
       previousWasOpaqueCandidate = opaqueCandidate;
       opaqueTabCount = 0;
@@ -364,9 +368,12 @@ function issuesFor(step: FocusStep): FocusIssue[] {
 async function readActiveElement(page: Page, cdp: CDPSession, index: number): Promise<ObservedFocusStep | null> {
   let accessibleName = "";
   let computedRole = "";
+  let elementIdentity = "";
   try {
     const active = await cdp.send("Runtime.evaluate", { expression: DEEPEST_ACTIVE_ELEMENT_EXPRESSION, objectGroup: "focuspath" });
     if (active.result.objectId) {
+      const described = await cdp.send("DOM.describeNode", { objectId: active.result.objectId });
+      elementIdentity = `backend-node:${described.node.backendNodeId}`;
       const tree = await cdp.send("Accessibility.getPartialAXTree", { objectId: active.result.objectId, fetchRelatives: false });
       accessibleName = String(tree.nodes[0]?.name?.value ?? "").trim();
       computedRole = String(tree.nodes[0]?.role?.value ?? "").trim();
@@ -375,7 +382,7 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
     await cdp.send("Runtime.releaseObjectGroup", { objectGroup: "focuspath" });
   }
 
-  return page.evaluate(({ stepIndex, computedName, accessibilityRole }) => {
+  return page.evaluate(({ stepIndex, computedName, accessibilityRole, identity }) => {
     let element = document.activeElement;
     let confirmedOpaqueHost = false;
     let opaqueCandidate = false;
@@ -412,6 +419,7 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
 
     const selector = uniqueSelector(focused);
     const rect = absoluteRect(focused);
+    const scrollContext = nearestScrollContext(focused);
     const styles = focused.ownerDocument.defaultView?.getComputedStyle(focused) ?? getComputedStyle(focused);
     const tagName = focused.tagName.toLowerCase();
     const explicitRole = focused.getAttribute("role");
@@ -425,6 +433,7 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
 
     return {
       index: stepIndex,
+      identity,
       selector,
       tagName,
       role: accessibilityRole || explicitRole || implicitRoles[tagName] || null,
@@ -441,6 +450,7 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
         outline: `${styles.outlineWidth} ${styles.outlineStyle} ${styles.outlineColor}`,
         boxShadow: styles.boxShadow,
       },
+      ...(scrollContext ? { scrollContext } : {}),
       confirmedOpaqueHost,
       opaqueCandidate,
     };
@@ -472,6 +482,32 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
       return { x, y, width: rect.width, height: rect.height };
     }
 
+    function nearestScrollContext(node: HTMLElement): { selector: string; scrollLeft: number; scrollTop: number } | null {
+      let ancestor: Element | null = composedParent(node);
+      while (ancestor && ancestor !== document.documentElement && ancestor !== document.body) {
+        if (ancestor instanceof HTMLElement) {
+          const styles = ancestor.ownerDocument.defaultView?.getComputedStyle(ancestor) ?? getComputedStyle(ancestor);
+          const scrollsX = /(auto|scroll|overlay)/.test(styles.overflowX) && ancestor.scrollWidth > ancestor.clientWidth;
+          const scrollsY = /(auto|scroll|overlay)/.test(styles.overflowY) && ancestor.scrollHeight > ancestor.clientHeight;
+          if (scrollsX || scrollsY) {
+            return {
+              selector: uniqueSelector(ancestor),
+              scrollLeft: Math.round(ancestor.scrollLeft),
+              scrollTop: Math.round(ancestor.scrollTop),
+            };
+          }
+        }
+        ancestor = composedParent(ancestor);
+      }
+      return null;
+    }
+
+    function composedParent(node: Element): Element | null {
+      if (node.parentElement) return node.parentElement;
+      const root = node.getRootNode();
+      return root instanceof ShadowRoot ? root.host : null;
+    }
+
     function uniqueSelector(node: Element): string {
       const root = node.getRootNode();
       const prefix = root instanceof ShadowRoot
@@ -494,5 +530,5 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
       }
       return `${prefix}${parts.join(" > ")}`;
     }
-  }, { stepIndex: index, computedName: accessibleName.slice(0, 160), accessibilityRole: computedRole });
+  }, { stepIndex: index, computedName: accessibleName.slice(0, 160), accessibilityRole: computedRole, identity: elementIdentity });
 }

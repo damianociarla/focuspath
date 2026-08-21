@@ -78,6 +78,12 @@ npm run build
 npm run dev
 ```
 
+To exercise the CLI directly from the TypeScript workspace, run the generated bundle through the development command:
+
+```bash
+npm run dev --workspace focuspath -- https://example.com
+```
+
 The monorepo contains:
 
 - `packages/focuspath`: scanner, report generator and CLI
@@ -106,7 +112,7 @@ Content-Type: application/json
 {"url":"https://example.com"}
 ```
 
-The response contains the engine version, traversal direction, total Tab count, effective traversal limits, focus stops, findings, and a self-contained `reportHtml` document. The hosted beta currently scans forward. `GET /health` reports API readiness and engine version. The beta API intentionally accepts only public HTTP(S) targets on ports 80 and 443, revalidates DNS for browser requests, limits scan duration and request volume, and rate-limits clients and target hostnames. Complete SSRF containment still requires infrastructure-enforced egress filtering; see the AWS infrastructure notes.
+The response contains the engine version, traversal direction, total Tab count, effective traversal limits, focus stops, findings, and a self-contained `reportHtml` document. Stops affected by an independently scrollable container are retained as sequence-only evidence and omitted from the final screenshot overlay. The hosted beta currently scans forward. `GET /health` reports API readiness and engine version. The beta API intentionally accepts only public HTTP(S) targets on ports 80 and 443, revalidates DNS for browser requests, limits scan duration and request volume, and atomically rate-limits clients, global capacity and target hostnames. Complete SSRF containment still requires infrastructure-enforced egress filtering; see the AWS infrastructure notes.
 
 FocusPath does not intentionally persist submitted page content or generated reports. AWS and GitHub may retain request metadata according to their operational logging policies; no application-level report store is configured for the beta.
 

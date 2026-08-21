@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFileSync } from "node:fs";
 import { generateHtmlReport, ScanTimeoutError, scanFocusPath } from "focuspath";
 import { assertPublicUrl, createPublicUrlPolicy, parseHttpUrl, UnsafeUrlError } from "./network-policy.js";
-import { clientAddress, hasValidOriginToken, SlidingWindowLimiter } from "./security.js";
+import { clientAddress, consumeRateLimits, hasValidOriginToken, SlidingWindowLimiter } from "./security.js";
 
 const port = Number(process.env.PORT ?? 8787);
 const maxConcurrentScans = Number(process.env.MAX_CONCURRENT_SCANS ?? 2);
@@ -77,23 +77,20 @@ const server = createServer(async (request, response) => {
     parseHttpUrl(submitted);
 
     const client = clientAddress(request);
-    if (!clientLimiter.consume(client)) {
-      response.setHeader("retry-after", "600");
-      json(response, 429, { error: "Scan limit reached. Try again in a few minutes." });
-      return;
-    }
-
     const url = await assertPublicUrl(submitted);
-
-    if (!globalLimiter.consume("all")) {
-      response.setHeader("retry-after", "3600");
-      json(response, 429, { error: "The public demo has reached its hourly capacity. Try again later." });
-      return;
-    }
-
-    if (!targetLimiter.consume(url.hostname)) {
-      response.setHeader("retry-after", "3600");
-      json(response, 429, { error: "This hostname was already scanned recently. Try again later." });
+    const rejectedLimit = consumeRateLimits([
+      { limiter: clientLimiter, key: client },
+      { limiter: globalLimiter, key: "all" },
+      { limiter: targetLimiter, key: url.hostname },
+    ]);
+    if (rejectedLimit !== null) {
+      const rejected = [
+        { retryAfter: "600", error: "Scan limit reached. Try again in a few minutes." },
+        { retryAfter: "3600", error: "The public demo has reached its hourly capacity. Try again later." },
+        { retryAfter: "3600", error: "This hostname was already scanned recently. Try again later." },
+      ][rejectedLimit]!;
+      response.setHeader("retry-after", rejected.retryAfter);
+      json(response, 429, { error: rejected.error });
       return;
     }
 

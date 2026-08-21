@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FocusPath Live Scanner API
-  version: 0.4.0
+  version: 0.4.1
   description: Rate-limited public demo API; not a general-purpose scanning service.
 paths:
   /health:
@@ -97,6 +97,9 @@ components:
         href: { type: [string, "null"], format: uri }
         rect: { $ref: "#/components/schemas/Rect" }
         focusIndicator: { $ref: "#/components/schemas/FocusStyles" }
+        scrollContext:
+          description: Present when the step is sequence-only because an independently scrollable ancestor changed state.
+          $ref: "#/components/schemas/ScrollContext"
     Rect:
       type: object
       additionalProperties: false
@@ -113,6 +116,14 @@ components:
       properties:
         outline: { type: string }
         boxShadow: { type: string }
+    ScrollContext:
+      type: object
+      additionalProperties: false
+      required: [selector, scrollLeft, scrollTop]
+      properties:
+        selector: { type: string }
+        scrollLeft: { type: number }
+        scrollTop: { type: number }
     FocusIssue:
       type: object
       additionalProperties: false

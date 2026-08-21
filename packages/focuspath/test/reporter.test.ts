@@ -37,4 +37,40 @@ describe("reporter", () => {
     expect(html).toContain("<dt>direction</dt><dd>reverse</dd>");
     expect(html).toContain("limits: 50 stops / 200 Tab presses / 100 per opaque host");
   });
+
+  it("does not place scroll-container steps over a different screenshot state", () => {
+    const report: FocusReport = {
+      version: 2,
+      direction: "forward",
+      url: "https://example.com/",
+      title: "Scrollable controls",
+      scannedAt: "2026-08-21T00:00:00.000Z",
+      durationMs: 80,
+      tabPressCount: 2,
+      limits: { maxSteps: 50, maxTabPresses: 200, maxOpaqueTabPresses: 100 },
+      viewport: { width: 800, height: 500 },
+      document: { width: 800, height: 500 },
+      screenshot: "data:image/jpeg;base64,test",
+      stoppedBecause: "document-exhausted",
+      steps: [{
+        index: 1,
+        selector: "#scroller > button:nth-of-type(1)",
+        tagName: "button",
+        role: "button",
+        accessibleName: "One",
+        tabIndex: 0,
+        href: null,
+        rect: { x: 20, y: 30, width: 100, height: 40 },
+        focusIndicator: { outline: "2px solid black", boxShadow: "none" },
+        scrollContext: { selector: "#scroller", scrollLeft: 0, scrollTop: 70 },
+      }],
+      issues: [],
+    };
+
+    const html = generateHtmlReport(report);
+    expect(html).not.toContain("<g class=\"focus-node\">");
+    expect(html).toContain("<strong>1 step is sequence-only.</strong>");
+    expect(html).toContain("Sequence only — inside #scroller at scroll 0, 70");
+    expect(html).toContain("<th scope=\"col\">Visual evidence</th>");
+  });
 });
