@@ -18,8 +18,6 @@ export class UnsafeUrlError extends Error {
 }
 
 export function createPublicUrlPolicy(): (value: string) => Promise<boolean> {
-  const cache = new Map<string, boolean>();
-
   return async (value: string): Promise<boolean> => {
     let url: URL;
     try {
@@ -34,25 +32,28 @@ export function createPublicUrlPolicy(): (value: string) => Promise<boolean> {
 
     const hostname = url.hostname.toLowerCase().replace(/\.$/, "");
     if (!hostname || BLOCKED_HOSTS.has(hostname) || BLOCKED_HOST_SUFFIXES.some((suffix) => hostname.endsWith(suffix))) return false;
-    const cached = cache.get(hostname);
-    if (cached !== undefined) return cached;
-
-    const allowed = await resolvesOnlyToPublicAddresses(hostname);
-    cache.set(hostname, allowed);
-    return allowed;
+    // Resolve every request instead of trusting an earlier result for the hostname.
+    // Infrastructure-level egress filtering is still required to fully close DNS rebinding TOCTOU.
+    return resolvesOnlyToPublicAddresses(hostname);
   };
 }
 
 export async function assertPublicUrl(value: string): Promise<URL> {
+  const url = parseHttpUrl(value);
+  const policy = createPublicUrlPolicy();
+  if (!(await policy(url.toString()))) throw new UnsafeUrlError();
+  return url;
+}
+
+export function parseHttpUrl(value: string): URL {
   let url: URL;
   try {
+    if (/^[a-z][a-z\d+.-]*:\/\//i.test(value) && !/^https?:\/\//i.test(value)) throw new TypeError("Unsupported protocol");
     url = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
   } catch {
     throw new UnsafeUrlError("Enter a valid website URL.");
   }
 
-  const policy = createPublicUrlPolicy();
-  if (!(await policy(url.toString()))) throw new UnsafeUrlError();
   return url;
 }
 

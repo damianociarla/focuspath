@@ -1,6 +1,6 @@
 {
   "name": "focuspath",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "See where keyboard navigation breaks. A visual accessibility scanner for focus order.",
   "type": "module",
   "license": "MIT",
@@ -32,14 +32,16 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsup src/index.ts src/cli.ts --format esm --dts --clean",
     "dev": "tsx src/cli.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build && npm test"
+    "prepublishOnly": "npm run build && npm test",
+    "pack:check": "node scripts/check-package.mjs"
   },
   "dependencies": {
     "playwright": "^1.55.0"
