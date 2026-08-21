@@ -3,12 +3,62 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="FocusPath visualizes keyboard focus order and finds deterministic accessibility problems from the command line." />
+    <title>FocusPath — Visual keyboard accessibility scanner</title>
+    <meta name="description" content="Scan any public website to visualize its keyboard focus order, uncover accessibility issues, and download a portable HTML report with FocusPath." />
+    <meta name="author" content="Damiano Ciarla" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="theme-color" content="#090b0a" />
-    <link rel="icon" href="%BASE_URL%favicon.svg" type="image/svg+xml" />
+    <link rel="canonical" href="https://damianociarla.github.io/focuspath/" />
+
+    <link rel="icon" href="%BASE_URL%favicon.svg" type="image/svg+xml" sizes="any" />
+    <link rel="icon" href="%BASE_URL%favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="%BASE_URL%apple-touch-icon.png" sizes="180x180" />
+    <link rel="manifest" href="%BASE_URL%site.webmanifest" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="FocusPath" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:url" content="https://damianociarla.github.io/focuspath/" />
     <meta property="og:title" content="FocusPath — See where keyboard navigation breaks" />
-    <meta property="og:description" content="An open-source visual accessibility scanner for keyboard focus order." />
-    <title>FocusPath — Visual keyboard accessibility testing</title>
+    <meta property="og:description" content="Scan a public website, visualize every keyboard focus stop, and download an actionable accessibility report." />
+    <meta property="og:image" content="https://damianociarla.github.io/focuspath/social-card.png" />
+    <meta property="og:image:secure_url" content="https://damianociarla.github.io/focuspath/social-card.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="FocusPath logo and the message See where keyboard navigation breaks" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="FocusPath — See where keyboard navigation breaks" />
+    <meta name="twitter:description" content="Scan a public website and turn its keyboard focus order into an actionable visual report." />
+    <meta name="twitter:image" content="https://damianociarla.github.io/focuspath/social-card.png" />
+    <meta name="twitter:image:alt" content="FocusPath logo and the message See where keyboard navigation breaks" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": ["SoftwareApplication", "WebApplication"],
+        "name": "FocusPath",
+        "url": "https://damianociarla.github.io/focuspath/",
+        "image": "https://damianociarla.github.io/focuspath/social-card.png",
+        "description": "An open-source visual accessibility scanner that maps keyboard focus order and creates portable HTML reports.",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Any operating system with a modern web browser",
+        "softwareVersion": "0.1.0",
+        "license": "https://opensource.org/license/mit",
+        "codeRepository": "https://github.com/damianociarla/focuspath",
+        "author": {
+          "@type": "Person",
+          "name": "Damiano Ciarla",
+          "url": "https://github.com/damianociarla"
+        },
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "EUR"
+        }
+      }
+    </script>
   </head>
   <body>
     <header class="nav">
@@ -80,7 +130,7 @@
               <div class="result-title"><span data-result-status>Complete</span><h3 data-result-title></h3><p data-result-url></p></div>
               <div class="result-metrics"><div><strong data-result-stops>0</strong><span>Stops</span></div><div><strong data-result-errors>0</strong><span>Errors</span></div><div><strong data-result-warnings>0</strong><span>Warnings</span></div></div>
               <ul class="result-issues" data-result-issues></ul>
-              <div class="result-actions"><a data-open-report target="_blank" rel="noopener">Open report ↗</a><a data-download-report download="focuspath-report.html">Download HTML ↓</a></div>
+              <div class="result-actions"><a data-open-report href="#scan" target="_blank" rel="noopener">Open report ↗</a><a data-download-report href="#scan" download="focuspath-report.html">Download HTML ↓</a></div>
             </div>
           </div>
         </div>

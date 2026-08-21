@@ -1,5 +1,2 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="8" fill="#090b0a"/>
-  <rect x="9" y="9" width="46" height="46" rx="3" fill="none" stroke="#b7ff57" stroke-width="3"/>
-  <path d="M25 19h20v6H31v7h12v6H31v10h-6z" fill="#b7ff57"/>
-</svg>
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="64px" height="64px" viewBox="0 0 64 64" version="1.1"><title>FocusPath favicon</title><desc>A focus route shaped like the letter F, ending in an issue marker.</desc><rect fill="#090b0a" x="0" y="0" width="64" height="64" rx="14" ry="14" /><path fill="none" stroke="#b7ff57" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" d="M18 49 V17 H47 M18 33 H39" /><circle fill="#090b0a" stroke="#b7ff57" stroke-width="2.5" cx="18" cy="49" r="4" /><circle fill="#090b0a" stroke="#b7ff57" stroke-width="2.5" cx="47" cy="17" r="4" /><circle fill="#090b0a" stroke="#ff6a5f" stroke-width="2.5" cx="39" cy="33" r="4" /></svg>

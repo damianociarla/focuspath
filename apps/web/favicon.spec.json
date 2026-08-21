@@ -1,0 +1,70 @@
+{
+  "canvas": {
+    "width": 64,
+    "height": 64,
+    "viewBox": "0 0 64 64",
+    "units": "px"
+  },
+  "elements": [
+    {
+      "type": "rect",
+      "x": 0,
+      "y": 0,
+      "width": 64,
+      "height": 64,
+      "rx": 14,
+      "ry": 14,
+      "style": {
+        "fill": "#090b0a"
+      }
+    },
+    {
+      "type": "path",
+      "d": "M18 49 V17 H47 M18 33 H39",
+      "style": {
+        "fill": "none",
+        "stroke": "#b7ff57",
+        "strokeWidth": 6,
+        "strokeLinecap": "round",
+        "strokeLinejoin": "round"
+      }
+    },
+    {
+      "type": "circle",
+      "cx": 18,
+      "cy": 49,
+      "r": 4,
+      "style": {
+        "fill": "#090b0a",
+        "stroke": "#b7ff57",
+        "strokeWidth": 2.5
+      }
+    },
+    {
+      "type": "circle",
+      "cx": 47,
+      "cy": 17,
+      "r": 4,
+      "style": {
+        "fill": "#090b0a",
+        "stroke": "#b7ff57",
+        "strokeWidth": 2.5
+      }
+    },
+    {
+      "type": "circle",
+      "cx": 39,
+      "cy": 33,
+      "r": 4,
+      "style": {
+        "fill": "#090b0a",
+        "stroke": "#ff6a5f",
+        "strokeWidth": 2.5
+      }
+    }
+  ],
+  "metadata": {
+    "title": "FocusPath favicon",
+    "desc": "A focus route shaped like the letter F, ending in an issue marker."
+  }
+}

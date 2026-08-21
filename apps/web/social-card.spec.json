@@ -1,0 +1,152 @@
+{
+  "canvas": {
+    "width": 1200,
+    "height": 630,
+    "viewBox": "0 0 1200 630",
+    "units": "px"
+  },
+  "elements": [
+    {
+      "type": "rect",
+      "x": 0,
+      "y": 0,
+      "width": 1200,
+      "height": 630,
+      "style": { "fill": "#090b0a" }
+    },
+    {
+      "type": "path",
+      "d": "M820 98 C1010 98 940 260 1080 270 S1050 480 870 500",
+      "style": {
+        "fill": "none",
+        "stroke": "#b7ff57",
+        "strokeWidth": 4,
+        "strokeLinecap": "round",
+        "strokeDasharray": "12 14",
+        "opacity": 0.75
+      }
+    },
+    {
+      "type": "circle",
+      "cx": 820,
+      "cy": 98,
+      "r": 24,
+      "style": { "fill": "#090b0a", "stroke": "#b7ff57", "strokeWidth": 4 }
+    },
+    {
+      "type": "circle",
+      "cx": 1080,
+      "cy": 270,
+      "r": 24,
+      "style": { "fill": "#090b0a", "stroke": "#ff6a5f", "strokeWidth": 4 }
+    },
+    {
+      "type": "circle",
+      "cx": 870,
+      "cy": 500,
+      "r": 24,
+      "style": { "fill": "#090b0a", "stroke": "#b7ff57", "strokeWidth": 4 }
+    },
+    {
+      "type": "rect",
+      "x": 72,
+      "y": 68,
+      "width": 82,
+      "height": 82,
+      "rx": 18,
+      "ry": 18,
+      "style": { "fill": "#101311" }
+    },
+    {
+      "type": "path",
+      "d": "M94 128 V90 H132 M94 108 H122",
+      "style": {
+        "fill": "none",
+        "stroke": "#b7ff57",
+        "strokeWidth": 7,
+        "strokeLinecap": "round",
+        "strokeLinejoin": "round"
+      }
+    },
+    {
+      "type": "circle",
+      "cx": 122,
+      "cy": 108,
+      "r": 5,
+      "style": { "fill": "#090b0a", "stroke": "#ff6a5f", "strokeWidth": 3 }
+    },
+    {
+      "type": "text",
+      "x": 176,
+      "y": 110,
+      "text": "FocusPath",
+      "baseline": "middle",
+      "style": {
+        "fill": "#f0f4ef",
+        "fontFamily": "Arial, Helvetica, sans-serif",
+        "fontSize": 42,
+        "fontWeight": 700
+      }
+    },
+    {
+      "type": "text",
+      "x": 72,
+      "y": 232,
+      "text": "SEE WHERE KEYBOARD NAVIGATION",
+      "style": {
+        "fill": "#8d968f",
+        "fontFamily": "Menlo, Consolas, monospace",
+        "fontSize": 20,
+        "fontWeight": 500,
+        "letterSpacing": 2
+      }
+    },
+    {
+      "type": "text",
+      "x": 72,
+      "y": 330,
+      "text": "breaks.",
+      "style": {
+        "fill": "#b7ff57",
+        "fontFamily": "Arial, Helvetica, sans-serif",
+        "fontSize": 112,
+        "fontWeight": 700
+      }
+    },
+    {
+      "type": "text",
+      "x": 76,
+      "y": 414,
+      "text": "Open-source visual accessibility scanner",
+      "style": {
+        "fill": "#c0c6c1",
+        "fontFamily": "Arial, Helvetica, sans-serif",
+        "fontSize": 30,
+        "fontWeight": 400
+      }
+    },
+    {
+      "type": "line",
+      "x1": 72,
+      "y1": 520,
+      "x2": 686,
+      "y2": 520,
+      "style": { "stroke": "#252b27", "strokeWidth": 2 }
+    },
+    {
+      "type": "text",
+      "x": 72,
+      "y": 566,
+      "text": "damianociarla.github.io/focuspath",
+      "style": {
+        "fill": "#8d968f",
+        "fontFamily": "Menlo, Consolas, monospace",
+        "fontSize": 19
+      }
+    }
+  ],
+  "metadata": {
+    "title": "FocusPath social sharing card",
+    "desc": "A dark social preview with the FocusPath mark, tagline, and a keyboard focus route."
+  }
+}

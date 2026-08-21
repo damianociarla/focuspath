@@ -1,0 +1,30 @@
+{
+  "name": "FocusPath — Visual keyboard accessibility scanner",
+  "short_name": "FocusPath",
+  "description": "Visualize keyboard focus order and uncover accessibility issues.",
+  "start_url": "/focuspath/",
+  "scope": "/focuspath/",
+  "display": "standalone",
+  "background_color": "#090b0a",
+  "theme_color": "#090b0a",
+  "icons": [
+    {
+      "src": "/focuspath/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/focuspath/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/focuspath/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
