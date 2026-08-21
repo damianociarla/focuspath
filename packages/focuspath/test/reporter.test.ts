@@ -81,4 +81,32 @@ describe("reporter", () => {
     expect(nestedHtml).toContain("viewport #frame &gt;&gt;&gt; :viewport at scroll 0, 140; element #outer at scroll 0, 40");
     expect(nestedHtml).not.toContain("<g class=\"focus-node\">");
   });
+
+  it("does not extend the overlay beyond the pixels in the screenshot", () => {
+    const report: FocusReport = {
+      version: 2,
+      direction: "forward",
+      url: "https://example.com/",
+      title: "Scroll locked page",
+      scannedAt: "2026-08-21T00:00:00.000Z",
+      durationMs: 80,
+      tabPressCount: 2,
+      limits: { maxSteps: 50, maxTabPresses: 200, maxOpaqueTabPresses: 100 },
+      viewport: { width: 800, height: 500 },
+      document: { width: 800, height: 500 },
+      screenshot: "data:image/jpeg;base64,test",
+      stoppedBecause: "document-exhausted",
+      steps: [
+        { index: 1, selector: "#visible", tagName: "button", role: "button", accessibleName: "Visible", tabIndex: 0, href: null, rect: { x: 20, y: 30, width: 100, height: 40 }, focusIndicator: { outline: "2px solid black", boxShadow: "none" } },
+        { index: 2, selector: "#deep", tagName: "button", role: "button", accessibleName: "Deep", tabIndex: 0, href: null, rect: { x: 20, y: 900, width: 100, height: 40 }, focusIndicator: { outline: "2px solid black", boxShadow: "none" } },
+      ],
+      issues: [],
+    };
+
+    const html = generateHtmlReport(report);
+    expect(html.match(/<g class="focus-node">/g)).toHaveLength(1);
+    expect(html).not.toContain("y2=\"920\"");
+    expect(html).toContain("Sequence only — outside the captured screenshot");
+    expect(html).toContain("<strong>1 step is sequence-only.</strong>");
+  });
 });
