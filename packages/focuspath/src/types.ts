@@ -25,6 +25,16 @@ export interface FocusStep {
     outline: string;
     boxShadow: string;
   };
+  /**
+   * Present when browser focus scrolling changed an independently scrollable
+   * ancestor. These steps remain in the sequence but are not positioned over
+   * the final page screenshot, which represents a different scroll state.
+   */
+  scrollContext?: {
+    selector: string;
+    scrollLeft: number;
+    scrollTop: number;
+  };
 }
 
 export interface FocusIssue {

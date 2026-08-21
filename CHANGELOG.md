@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1
+
+- Separate Chromium DOM identity from human-readable selectors when detecting stalls and cycles.
+- Mark stops inside independently scrollable containers as sequence-only instead of plotting them over a different final screenshot state.
+- Exercise reverse traversal across positive tabindex, open and closed shadow roots, and same- and cross-origin frames.
+- Run the development CLI from its generated bundle and smoke-test the documented workflow in CI.
+- Commit client, global, and target-host quotas atomically so rejected requests do not consume unrelated capacity.
+
 ## 0.4.0
 
 - Add reverse keyboard traversal with `Shift+Tab` to the TypeScript API and CLI.

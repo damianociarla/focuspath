@@ -31,7 +31,7 @@
 
     <main id="documentation" tabindex="-1">
       <section class="docs-hero" aria-labelledby="docs-title">
-        <div><p class="eyebrow">Documentation / v0.4.0</p><h1 id="docs-title">Map the route.<br /><em>Keep the evidence.</em></h1></div>
+        <div><p class="eyebrow">Documentation / v0.4.1</p><h1 id="docs-title">Map the route.<br /><em>Keep the evidence.</em></h1></div>
         <div class="hero-note"><p>FocusPath follows Tab or Shift+Tab navigation in a real Chromium session, records observable focus stops, and produces a portable HTML report.</p><div><a class="action" href="#install">Install</a><a href="https://github.com/damianociarla/focuspath/blob/main/docs/openapi.yml">OpenAPI ↗</a></div></div>
       </section>
 
@@ -71,7 +71,9 @@ const html = generateHtmlReport(report);</code></pre>
             <div class="model" role="list" aria-label="FocusPath traversal stages"><div role="listitem"><span>Move</span><p>Chromium performs native Tab or Shift+Tab navigation in the selected direction.</p></div><div role="listitem"><span>Observe</span><p>The deepest inspectable active element becomes a focus stop.</p></div><div role="listitem"><span>Explain</span><p>Deterministic findings are attached to that existing stop.</p></div></div>
             <h3>Opaque boundaries</h3>
             <p>Cross-origin iframes are known to be opaque. A custom element without an open shadow root is only treated as a candidate; FocusPath infers a closed shadow root only when repeated, uncanceled Tab presses keep focus on that host. A canceled Tab event is reported as stalled focus instead. Internal controls cannot be named or positioned, but traversal may continue within the independent Tab budget.</p>
-            <p>FocusPath detects missing accessible names, generic roles, positive <code>tabindex</code>, cycles and stalled focus. It is evidence for review—not a WCAG certification.</p>
+            <p>FocusPath detects missing accessible names, generic roles, positive <code>tabindex</code>, cycles and stalled focus. Element identity comes from Chromium rather than the display selector, so similar deep DOM branches remain distinct.</p>
+            <h3>Scrollable containers</h3>
+            <p>A final screenshot cannot truthfully represent every intermediate scroll position. Stops that move an independently scrollable container remain in the ordered table with their recorded scroll state, but are intentionally omitted from the screenshot overlay. FocusPath is evidence for review—not a WCAG certification.</p>
           </section>
 
           <section id="http-api" aria-labelledby="http-title">

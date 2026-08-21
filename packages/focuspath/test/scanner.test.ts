@@ -35,6 +35,20 @@ describe("focus scanner", () => {
     expect(stalled.issues).toContainEqual(expect.objectContaining({ kind: "focus-stalled", step: 1 }));
   });
 
+  it.each([
+    ["forward", ["First branch", "Second branch", "After both"]],
+    ["reverse", ["After both", "Second branch", "First branch"]],
+  ] as const)("uses DOM identity instead of a truncated selector during %s traversal", async (direction, expectedNames) => {
+    const branch = (label: string) => `<section><div><div><div><div><div><button>${label}</button></div></div></div></div></div></section>`;
+    const report = await scanFocusPath(page(`${branch("First branch")}${branch("Second branch")}<a href="#after">After both</a>`), { direction, focusSettleMs: 0 });
+
+    expect(report.steps.map((step) => step.accessibleName)).toEqual(expectedNames);
+    const branchSteps = report.steps.filter((step) => step.accessibleName.endsWith("branch"));
+    expect(branchSteps[0]?.selector).toBe(branchSteps[1]?.selector);
+    expect(report.issues).not.toContainEqual(expect.objectContaining({ kind: "focus-stalled" }));
+    expect(report.stoppedBecause).toBe("document-exhausted");
+  });
+
   it("applies the timeout to the complete scan", async () => {
     await expect(scanFocusPath(page(`<button>One</button><button>Two</button>`), {
       focusSettleMs: 500,
@@ -70,6 +84,20 @@ describe("focus scanner", () => {
     });
     const fixed = report.steps.find((step) => step.selector === "#fixed");
     expect(fixed?.rect).toMatchObject({ x: 14, y: 12 });
+  });
+
+  it("marks focus stops inside scroll containers as sequence-only evidence", async () => {
+    const controls = Array.from({ length: 5 }, (_, index) => `<button style="display:block;height:70px">Control ${index + 1}</button>`).join("");
+    const report = await scanFocusPath(page(`<div id="scroller" style="height:120px;overflow:auto">${controls}</div><a href="#after">After</a>`), {
+      focusSettleMs: 0,
+      viewport: { width: 800, height: 500 },
+    });
+
+    const scrolledSteps = report.steps.slice(0, 5);
+    expect(scrolledSteps).toHaveLength(5);
+    expect(scrolledSteps.every((step) => step.scrollContext?.selector === "#scroller")).toBe(true);
+    expect(scrolledSteps.some((step) => (step.scrollContext?.scrollTop ?? 0) > 0)).toBe(true);
+    expect(report.steps.at(-1)?.scrollContext).toBeUndefined();
   });
 
   it("handles elements removed while traversal is in progress", async () => {
@@ -166,6 +194,52 @@ describe("focus scanner", () => {
     expect(report.issues).not.toContainEqual(expect.objectContaining({ kind: "opaque-focus-host" }));
     expect(report.direction).toBe("reverse");
     expect(report.stoppedBecause).toBe("stalled-on-element");
+  });
+
+  it("traverses positive tabindex controls in Chromium reverse order", async () => {
+    const report = await scanFocusPath(page(`<button tabindex="2">Second positive</button><button tabindex="1">First positive</button><button>Natural</button>`), {
+      direction: "reverse",
+      focusSettleMs: 0,
+    });
+    expect(report.steps.map((step) => step.accessibleName)).toEqual(["Natural", "Second positive", "First positive"]);
+    expect(report.issues.filter((issue) => issue.kind === "positive-tabindex")).toHaveLength(2);
+  });
+
+  it("traverses an open shadow root in reverse", async () => {
+    const report = await scanFocusPath(page(`<button>Before</button><focus-card></focus-card><script>
+      const root = document.querySelector('focus-card').attachShadow({mode:'open'});
+      root.innerHTML = '<button>Shadow first</button><button>Shadow second</button>';
+    </script>`), { direction: "reverse", focusSettleMs: 0 });
+    expect(report.steps.map((step) => step.accessibleName)).toEqual(["Shadow second", "Shadow first", "Before"]);
+  });
+
+  it("continues beyond a closed shadow root in reverse", async () => {
+    const report = await scanFocusPath(page(`<button>Before</button><secret-control></secret-control><a href="#after">After</a><script>
+      const root = document.querySelector('secret-control').attachShadow({mode:'closed'});
+      root.innerHTML = '<button>Private first</button><button>Private second</button>';
+    </script>`), { direction: "reverse", focusSettleMs: 0 });
+    expect(report.steps.map((step) => step.accessibleName)).toEqual(["After", "", "Before"]);
+    expect(report.issues).toContainEqual(expect.objectContaining({ kind: "opaque-focus-host" }));
+    expect(report.issues).not.toContainEqual(expect.objectContaining({ kind: "focus-stalled" }));
+  });
+
+  it("traverses a same-origin iframe in reverse", async () => {
+    const report = await scanFocusPath(page(`<button>Before</button><iframe title="Editor" srcdoc='<button>Frame first</button><button>Frame second</button>'></iframe><a href="#after">After</a>`), {
+      direction: "reverse",
+      focusSettleMs: 0,
+    });
+    expect(report.steps.map((step) => step.accessibleName)).toEqual(["After", "Frame second", "Frame first", "Before"]);
+  });
+
+  it("continues beyond a cross-origin iframe in reverse", async () => {
+    const frame = page(`<button>Frame first</button><button>Frame second</button>`);
+    const report = await scanFocusPath(page(`<button>Before</button><iframe title="External tools" src="${frame}"></iframe><a href="#after">After</a>`), {
+      direction: "reverse",
+      focusSettleMs: 0,
+    });
+    expect(report.steps.map((step) => step.accessibleName)).toEqual(["After", "External tools", "Before"]);
+    expect(report.issues).toContainEqual(expect.objectContaining({ kind: "opaque-focus-host" }));
+    expect(report.issues).not.toContainEqual(expect.objectContaining({ kind: "focus-stalled" }));
   });
 
   it("continues beyond a cross-origin iframe with more than twenty controls", async () => {
