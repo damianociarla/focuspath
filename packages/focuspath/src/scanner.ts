@@ -4,6 +4,26 @@ import type { FocusIssue, FocusReport, FocusStep, ScanOptions } from "./types.js
 const DEFAULT_VIEWPORT = { width: 1440, height: 900 };
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_FOCUS_SETTLE_MS = 75;
+const NAMED_CONTROL_ROLES = new Set([
+  "button", "checkbox", "combobox", "link", "listbox", "menuitem", "menuitemcheckbox", "menuitemradio",
+  "option", "radio", "searchbox", "slider", "spinbutton", "switch", "tab", "textbox", "treeitem",
+]);
+const GENERIC_ROLES = new Set(["generic", "none", "presentation"]);
+const DEEPEST_ACTIVE_ELEMENT_EXPRESSION = `(() => {
+  let element = document.activeElement;
+  while (element?.nodeType === Node.ELEMENT_NODE) {
+    const shadowActive = element.shadowRoot?.activeElement;
+    if (shadowActive?.nodeType === Node.ELEMENT_NODE) { element = shadowActive; continue; }
+    if (element.tagName === "IFRAME") {
+      try {
+        const frameActive = element.contentDocument?.activeElement;
+        if (frameActive?.nodeType === Node.ELEMENT_NODE && frameActive !== element.contentDocument?.body) { element = frameActive; continue; }
+      } catch {}
+    }
+    break;
+  }
+  return element;
+})()`;
 
 export class ScanTimeoutError extends Error {
   constructor(timeoutMs: number) {
@@ -54,6 +74,13 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
       waitUntil: "domcontentloaded",
       timeout: remainingTime(startedAt, timeoutMs),
     });
+    await page.waitForFunction(() => Array.from(document.querySelectorAll("iframe")).every((frame) => {
+      try {
+        return frame.contentDocument === null || frame.contentDocument.readyState !== "loading";
+      } catch {
+        return true;
+      }
+    }), undefined, { timeout: Math.min(1_000, remainingTime(startedAt, timeoutMs)) }).catch(() => undefined);
 
     await page.evaluate(() => {
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
@@ -162,9 +189,19 @@ async function settleFocus(page: Page, delayMs: number): Promise<void> {
 
 function issuesFor(step: FocusStep): FocusIssue[] {
   const issues: FocusIssue[] = [];
-  const needsName = ["a", "button", "input", "select", "textarea"].includes(step.tagName) || step.role !== null;
+  const role = step.role?.toLowerCase() ?? null;
 
-  if (needsName && !step.accessibleName) {
+  if (role && GENERIC_ROLES.has(role)) {
+    issues.push({
+      kind: "missing-or-generic-role",
+      severity: "warning",
+      step: step.index,
+      selector: step.selector,
+      message: "Focusable element has no meaningful accessibility role.",
+    });
+  }
+
+  if (role && NAMED_CONTROL_ROLES.has(role) && !step.accessibleName) {
     issues.push({
       kind: "missing-name",
       severity: "error",
@@ -191,7 +228,7 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
   let accessibleName = "";
   let computedRole = "";
   try {
-    const active = await cdp.send("Runtime.evaluate", { expression: "document.activeElement", objectGroup: "focuspath" });
+    const active = await cdp.send("Runtime.evaluate", { expression: DEEPEST_ACTIVE_ELEMENT_EXPRESSION, objectGroup: "focuspath" });
     if (active.result.objectId) {
       const tree = await cdp.send("Accessibility.getPartialAXTree", { objectId: active.result.objectId, fetchRelatives: false });
       accessibleName = String(tree.nodes[0]?.name?.value ?? "").trim();
@@ -202,18 +239,40 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
   }
 
   return page.evaluate(({ stepIndex, computedName, accessibilityRole }) => {
-    const element = document.activeElement;
-    if (!(element instanceof HTMLElement) || element === document.body || element === document.documentElement) return null;
+    let element = document.activeElement;
+    while (element?.nodeType === Node.ELEMENT_NODE) {
+      const current = element as HTMLElement;
+      const shadowActive = current.shadowRoot?.activeElement;
+      if (shadowActive?.nodeType === Node.ELEMENT_NODE) {
+        element = shadowActive as HTMLElement;
+        continue;
+      }
+      if (current.tagName === "IFRAME") {
+        try {
+          const frame = current as HTMLIFrameElement;
+          const frameActive = frame.contentDocument?.activeElement;
+          if (frameActive?.nodeType === Node.ELEMENT_NODE && frameActive !== frame.contentDocument?.body) {
+            element = frameActive as HTMLElement;
+            continue;
+          }
+        } catch {
+          // Cross-origin frame contents are intentionally opaque.
+        }
+      }
+      break;
+    }
+    if (!element || element.nodeType !== Node.ELEMENT_NODE || element === document.body || element === document.documentElement) return null;
+    const focused = element as HTMLElement;
 
-    const selector = uniqueSelector(element);
-    const rect = element.getBoundingClientRect();
-    const styles = getComputedStyle(element);
-    const tagName = element.tagName.toLowerCase();
-    const explicitRole = element.getAttribute("role");
+    const selector = uniqueSelector(focused);
+    const rect = absoluteRect(focused);
+    const styles = focused.ownerDocument.defaultView?.getComputedStyle(focused) ?? getComputedStyle(focused);
+    const tagName = focused.tagName.toLowerCase();
+    const explicitRole = focused.getAttribute("role");
     const implicitRoles: Record<string, string> = {
       a: "link",
       button: "button",
-      input: element.getAttribute("type") === "checkbox" ? "checkbox" : "textbox",
+      input: focused.getAttribute("type") === "checkbox" ? "checkbox" : "textbox",
       select: "combobox",
       textarea: "textbox",
     };
@@ -224,11 +283,11 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
       tagName,
       role: accessibilityRole || explicitRole || implicitRoles[tagName] || null,
       accessibleName: computedName,
-      tabIndex: element.tabIndex,
-      href: element instanceof HTMLAnchorElement ? element.href : null,
+      tabIndex: focused.tabIndex,
+      href: focused.tagName === "A" ? (focused as HTMLAnchorElement).href : null,
       rect: {
-        x: Math.round(rect.x + window.scrollX),
-        y: Math.round(rect.y + window.scrollY),
+        x: Math.round(rect.x),
+        y: Math.round(rect.y),
         width: Math.round(rect.width),
         height: Math.round(rect.height),
       },
@@ -238,8 +297,41 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
       },
     };
 
+    function absoluteRect(node: HTMLElement): { x: number; y: number; width: number; height: number } {
+      const rect = node.getBoundingClientRect();
+      let x = rect.x;
+      let y = rect.y;
+      let current: HTMLElement = node;
+      let view = node.ownerDocument.defaultView;
+
+      if (view && view.getComputedStyle(current).position !== "fixed") {
+        x += view.scrollX;
+        y += view.scrollY;
+      }
+
+      while (view?.frameElement) {
+        current = view.frameElement as HTMLElement;
+        const frameRect = current.getBoundingClientRect();
+        x += frameRect.x;
+        y += frameRect.y;
+        view = current.ownerDocument.defaultView;
+        if (view && view.getComputedStyle(current).position !== "fixed") {
+          x += view.scrollX;
+          y += view.scrollY;
+        }
+      }
+
+      return { x, y, width: rect.width, height: rect.height };
+    }
+
     function uniqueSelector(node: Element): string {
-      if (node.id) return `#${CSS.escape(node.id)}`;
+      const root = node.getRootNode();
+      const prefix = root instanceof ShadowRoot
+        ? `${uniqueSelector(root.host)} >>> `
+        : node.ownerDocument !== document && node.ownerDocument.defaultView?.frameElement
+          ? `${uniqueSelector(node.ownerDocument.defaultView.frameElement)} >>> `
+          : "";
+      if (node.id) return `${prefix}#${CSS.escape(node.id)}`;
       const parts: string[] = [];
       let current: Element | null = node;
       while (current && current !== document.documentElement && parts.length < 5) {
@@ -252,7 +344,7 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
         parts.unshift(part);
         current = parent;
       }
-      return parts.join(" > ");
+      return `${prefix}${parts.join(" > ")}`;
     }
   }, { stepIndex: index, computedName: accessibleName.slice(0, 160), accessibilityRole: computedRole });
 }

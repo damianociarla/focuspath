@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FocusPath Live Scanner API
-  version: 0.2.0
+  version: 0.3.0
   description: Rate-limited public demo API; not a general-purpose scanning service.
 paths:
   /health:
@@ -36,19 +36,7 @@ paths:
           description: Scan completed
           content:
             application/json:
-              schema:
-                type: object
-                required: [url, title, scannedAt, durationMs, stoppedBecause, steps, issues, reportHtml]
-                properties:
-                  url: { type: string, format: uri }
-                  title: { type: string }
-                  scannedAt: { type: string, format: date-time }
-                  durationMs: { type: integer, minimum: 0 }
-                  stoppedBecause:
-                    enum: [cycle-complete, step-limit, no-focusable-elements, document-exhausted, stalled-on-element]
-                  steps: { type: array, items: { type: object } }
-                  issues: { type: array, items: { type: object } }
-                  reportHtml: { type: string }
+              schema: { $ref: "#/components/schemas/ScanResponse" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "415": { $ref: "#/components/responses/UnsupportedMediaType" }
@@ -58,8 +46,73 @@ paths:
         "504": { $ref: "#/components/responses/ScanFailed" }
 components:
   schemas:
+    ScanResponse:
+      type: object
+      additionalProperties: false
+      required: [url, title, scannedAt, durationMs, stoppedBecause, steps, issues, reportHtml]
+      properties:
+        url: { type: string, format: uri }
+        title: { type: string }
+        scannedAt: { type: string, format: date-time }
+        durationMs: { type: integer, minimum: 0 }
+        stoppedBecause: { $ref: "#/components/schemas/StopReason" }
+        steps:
+          type: array
+          maxItems: 50
+          items: { $ref: "#/components/schemas/FocusStep" }
+        issues:
+          type: array
+          maxItems: 100
+          items: { $ref: "#/components/schemas/FocusIssue" }
+        reportHtml: { type: string }
+    StopReason:
+      type: string
+      enum: [cycle-complete, step-limit, no-focusable-elements, document-exhausted, stalled-on-element]
+    FocusStep:
+      type: object
+      additionalProperties: false
+      required: [index, selector, tagName, role, accessibleName, tabIndex, href, rect, focusIndicator]
+      properties:
+        index: { type: integer, minimum: 1, maximum: 50 }
+        selector: { type: string }
+        tagName: { type: string }
+        role: { type: [string, "null"] }
+        accessibleName: { type: string, maxLength: 160 }
+        tabIndex: { type: integer }
+        href: { type: [string, "null"], format: uri }
+        rect: { $ref: "#/components/schemas/Rect" }
+        focusIndicator: { $ref: "#/components/schemas/FocusStyles" }
+    Rect:
+      type: object
+      additionalProperties: false
+      required: [x, y, width, height]
+      properties:
+        x: { type: number }
+        y: { type: number }
+        width: { type: number, minimum: 0 }
+        height: { type: number, minimum: 0 }
+    FocusStyles:
+      type: object
+      additionalProperties: false
+      required: [outline, boxShadow]
+      properties:
+        outline: { type: string }
+        boxShadow: { type: string }
+    FocusIssue:
+      type: object
+      additionalProperties: false
+      required: [kind, severity, step, selector, message]
+      properties:
+        kind:
+          type: string
+          enum: [missing-name, missing-or-generic-role, positive-tabindex, focus-stalled]
+        severity: { type: string, enum: [error, warning] }
+        step: { type: integer, minimum: 1, maximum: 50 }
+        selector: { type: string }
+        message: { type: string }
     Error:
       type: object
+      additionalProperties: false
       required: [error]
       properties:
         error: { type: string }

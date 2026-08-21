@@ -1,4 +1,4 @@
-export type IssueKind = "missing-name" | "positive-tabindex" | "focus-stalled";
+export type IssueKind = "missing-name" | "missing-or-generic-role" | "positive-tabindex" | "focus-stalled";
 
 export interface FocusStep {
   index: number;

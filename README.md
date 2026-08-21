@@ -59,7 +59,7 @@ const html = generateHtmlReport(result);
 
 ## Development
 
-Requirements: Node.js 24+.
+Requirements: Node.js 24+. This is an intentional project baseline so the CLI, CI, Playwright container, and release workflow use the same runtime; broader compatibility can be considered once it has its own tested matrix.
 
 ```bash
 npm install

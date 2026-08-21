@@ -1,6 +1,6 @@
 {
   "name": "focuspath",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "See where keyboard navigation breaks. A visual accessibility scanner for focus order.",
   "type": "module",
   "license": "MIT",
@@ -22,7 +22,7 @@
     "testing"
   ],
   "bin": {
-    "focuspath": "./dist/cli.js"
+    "focuspath": "dist/cli.js"
   },
   "exports": {
     ".": {

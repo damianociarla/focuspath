@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+
+- Distinguish focusable elements with generic roles from named controls.
+- Traverse same-origin iframes and open shadow roots while preserving stable selectors.
+- Correct full-page coordinates for fixed focus targets.
+- Expand browser fixtures and add HTTP API end-to-end tests.
+- Publish complete OpenAPI schemas for scan steps, findings, geometry, and focus styles.
+- Align all workspace versions and add a tag-driven trusted publishing workflow.
+
 ## 0.2.0
 
 - Use Chromium's accessibility tree for computed control names and roles.
