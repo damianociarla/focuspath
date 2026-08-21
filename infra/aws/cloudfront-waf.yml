@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: FocusPath CloudFront WAF for the flat-rate Free plan
+
+Resources:
+  ApiWebAcl:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: focuspath-api-edge
+      Description: Edge protection for the FocusPath public scanner API
+      Scope: CLOUDFRONT
+      DefaultAction:
+        Allow: {}
+      VisibilityConfig:
+        CloudWatchMetricsEnabled: true
+        MetricName: focuspath-api-edge
+        SampledRequestsEnabled: true
+      Rules:
+        - Name: ScanRateLimit
+          Priority: 0
+          Action:
+            Block: {}
+          Statement:
+            RateBasedStatement:
+              AggregateKeyType: IP
+              EvaluationWindowSec: 60
+              Limit: 10
+              ScopeDownStatement:
+                ByteMatchStatement:
+                  FieldToMatch:
+                    UriPath: {}
+                  PositionalConstraint: STARTS_WITH
+                  SearchString: /v1/scans
+                  TextTransformations:
+                    - Priority: 0
+                      Type: NONE
+          VisibilityConfig:
+            CloudWatchMetricsEnabled: true
+            MetricName: focuspath-scan-rate-limit
+            SampledRequestsEnabled: true
+        - Name: AwsCommonProtection
+          Priority: 1
+          OverrideAction:
+            None: {}
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesCommonRuleSet
+          VisibilityConfig:
+            CloudWatchMetricsEnabled: true
+            MetricName: focuspath-aws-common-protection
+            SampledRequestsEnabled: true
+
+Outputs:
+  WebAclArn:
+    Description: Global WAF web ACL ARN for CloudFront and PricingPlanManager
+    Value: !GetAtt ApiWebAcl.Arn

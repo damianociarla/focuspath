@@ -21,9 +21,14 @@ Parameters:
     Type: Number
     Default: 20
     MinValue: 1
+  WebAclArn:
+    Type: String
+    Default: ""
+    Description: Optional global WAFv2 web ACL ARN for the CloudFront distribution
 
 Conditions:
   HasBudgetAlertEmail: !Not [!Equals [!Ref BudgetAlertEmail, ""]]
+  HasWebAcl: !Not [!Equals [!Ref WebAclArn, ""]]
 
 Resources:
   AppRunnerEcrAccessRole:
@@ -98,6 +103,7 @@ Resources:
         HttpVersion: http2and3
         IPV6Enabled: true
         PriceClass: PriceClass_100
+        WebACLId: !If [HasWebAcl, !Ref WebAclArn, !Ref AWS::NoValue]
         Origins:
           - Id: AppRunnerOrigin
             DomainName: !GetAtt ApiService.ServiceUrl

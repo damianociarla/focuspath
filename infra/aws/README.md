@@ -25,8 +25,9 @@ The script:
 1. Creates an immutable, scan-on-push ECR repository if needed.
 2. Builds the image for `linux/amd64` and pushes it to ECR.
 3. Reuses a private origin token from the ignored `infra/aws/.origin-verify-token` file (mode `600`). Back this file up securely if infrastructure deployments run from another machine.
-4. Deploys App Runner, its one-instance scaling cap and CloudFront with CloudFormation.
-5. Prints the protected public API URL and CloudFront distribution ID.
+4. Optionally deploys the global WAF stack in `us-east-1` when `FOCUSPATH_ENABLE_WAF=true`.
+5. Deploys App Runner, its one-instance scaling cap and CloudFront with CloudFormation.
+6. Prints the protected API URL and distribution ID.
 
 To receive AWS Budget alerts at 80% forecast and 100% actual of the default $20 monthly budget:
 
@@ -38,7 +39,15 @@ AWS sends a confirmation message to that address.
 
 ## CloudFront Free plan
 
-After the first deployment, open the printed distribution in the CloudFront console and choose **Plans → Free**. AWS currently manages flat-rate plan enrollment outside this CloudFormation stack. The Free plan includes CloudFront, WAF/DDoS protection and bot management with no overage charges. Configure its WAF rate rule for `/v1/scans` at the lowest suitable threshold; the application still enforces stricter per-client, per-target and global quotas.
+AWS accounts still using the AWS Free Tier are not eligible for CloudFront flat-rate plans. For those accounts, leave WAF disabled to avoid its pay-as-you-go base charge; CloudFront, the one-instance cap and application quotas remain active.
+
+Once the account is eligible, deploy and immediately enroll the printed distribution and WAF web ACL in **Plans → Free** in the CloudFront console:
+
+```bash
+FOCUSPATH_ENABLE_WAF=true ./infra/aws/deploy-app-runner.sh
+```
+
+Pricing-plan subscriptions are managed outside CloudFormation. The WAF stack blocks clients above 10 requests per minute on `/v1/scans`; the application also enforces stricter per-client, per-target and global quotas.
 
 Do not publish or use the direct `*.awsapprunner.com` URL. It returns `404` for scans without CloudFront's private origin header.
 
