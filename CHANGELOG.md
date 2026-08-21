@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.2
+
+- Follow scrolling and clipping contexts across same-origin iframe viewports and parent documents.
+- Record multiple `scrollContexts` per focus stop while retaining the v0.4.1 `scrollContext` compatibility alias.
+- Keep iframe steps out of the final screenshot overlay whenever nested viewport or parent-scroller state can differ.
+- Cover internal iframe scrolling, external parent scrollers, and combined contexts in forward and reverse traversal.
+
 ## 0.4.1
 
 - Separate Chromium DOM identity from human-readable selectors when detecting stalls and cycles.

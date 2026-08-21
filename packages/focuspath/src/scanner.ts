@@ -419,7 +419,7 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
 
     const selector = uniqueSelector(focused);
     const rect = absoluteRect(focused);
-    const scrollContext = nearestScrollContext(focused);
+    const scrollContexts = collectScrollContexts(focused);
     const styles = focused.ownerDocument.defaultView?.getComputedStyle(focused) ?? getComputedStyle(focused);
     const tagName = focused.tagName.toLowerCase();
     const explicitRole = focused.getAttribute("role");
@@ -450,7 +450,10 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
         outline: `${styles.outlineWidth} ${styles.outlineStyle} ${styles.outlineColor}`,
         boxShadow: styles.boxShadow,
       },
-      ...(scrollContext ? { scrollContext } : {}),
+      ...(scrollContexts.length > 0 ? {
+        scrollContexts,
+        scrollContext: scrollContexts[0],
+      } : {}),
       confirmedOpaqueHost,
       opaqueCandidate,
     };
@@ -482,35 +485,82 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
       return { x, y, width: rect.width, height: rect.height };
     }
 
-    function nearestScrollContext(node: HTMLElement): { selector: string; scrollLeft: number; scrollTop: number } | null {
-      let ancestor: Element | null = composedParent(node);
-      while (ancestor && ancestor !== document.documentElement && ancestor !== document.body) {
-        if (ancestor instanceof HTMLElement) {
-          const styles = ancestor.ownerDocument.defaultView?.getComputedStyle(ancestor) ?? getComputedStyle(ancestor);
-          const scrollsX = /(auto|scroll|overlay)/.test(styles.overflowX) && ancestor.scrollWidth > ancestor.clientWidth;
-          const scrollsY = /(auto|scroll|overlay)/.test(styles.overflowY) && ancestor.scrollHeight > ancestor.clientHeight;
-          if (scrollsX || scrollsY) {
-            return {
+    function collectScrollContexts(node: HTMLElement): Array<{
+      kind: "element" | "viewport";
+      selector: string;
+      scrollLeft: number;
+      scrollTop: number;
+    }> {
+      const contexts: Array<{
+        kind: "element" | "viewport";
+        selector: string;
+        scrollLeft: number;
+        scrollTop: number;
+      }> = [];
+      let current: Element = node;
+
+      while (true) {
+        let ancestor = composedParent(current);
+        while (ancestor) {
+          if (isHtmlElement(ancestor) && isScrollableElement(ancestor)) {
+            contexts.push({
+              kind: "element",
               selector: uniqueSelector(ancestor),
               scrollLeft: Math.round(ancestor.scrollLeft),
               scrollTop: Math.round(ancestor.scrollTop),
-            };
+            });
           }
+          ancestor = composedParent(ancestor);
         }
-        ancestor = composedParent(ancestor);
+
+        const ownerDocument = current.ownerDocument;
+        const view = ownerDocument.defaultView;
+        const frameElement = view?.frameElement;
+        if (!frameElement || !view || !isHtmlElement(frameElement)) break;
+
+        const scrollingElement = ownerDocument.scrollingElement ?? ownerDocument.documentElement;
+        const viewportClipsX = scrollingElement.scrollWidth > view.innerWidth;
+        const viewportClipsY = scrollingElement.scrollHeight > view.innerHeight;
+        if (viewportClipsX || viewportClipsY) {
+          contexts.push({
+            kind: "viewport",
+            selector: `${uniqueSelector(frameElement)} >>> :viewport`,
+            scrollLeft: Math.round(view.scrollX),
+            scrollTop: Math.round(view.scrollY),
+          });
+        }
+
+        current = frameElement;
       }
-      return null;
+
+      return contexts;
+    }
+
+    function isScrollableElement(node: HTMLElement): boolean {
+      const view = node.ownerDocument.defaultView;
+      const styles = view?.getComputedStyle(node) ?? getComputedStyle(node);
+      const scrollsX = /(auto|scroll|overlay)/.test(styles.overflowX) && node.scrollWidth > node.clientWidth;
+      const scrollsY = /(auto|scroll|overlay)/.test(styles.overflowY) && node.scrollHeight > node.clientHeight;
+      return scrollsX || scrollsY;
     }
 
     function composedParent(node: Element): Element | null {
       if (node.parentElement) return node.parentElement;
       const root = node.getRootNode();
-      return root instanceof ShadowRoot ? root.host : null;
+      return isShadowRoot(root) ? root.host : null;
+    }
+
+    function isHtmlElement(node: Element): node is HTMLElement {
+      return node.namespaceURI === "http://www.w3.org/1999/xhtml";
+    }
+
+    function isShadowRoot(root: Node): root is ShadowRoot {
+      return root.nodeType === Node.DOCUMENT_FRAGMENT_NODE && "host" in root;
     }
 
     function uniqueSelector(node: Element): string {
       const root = node.getRootNode();
-      const prefix = root instanceof ShadowRoot
+      const prefix = isShadowRoot(root)
         ? `${uniqueSelector(root.host)} >>> `
         : node.ownerDocument !== document && node.ownerDocument.defaultView?.frameElement
           ? `${uniqueSelector(node.ownerDocument.defaultView.frameElement)} >>> `

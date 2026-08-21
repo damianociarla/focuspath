@@ -31,7 +31,7 @@
 
     <main id="documentation" tabindex="-1">
       <section class="docs-hero" aria-labelledby="docs-title">
-        <div><p class="eyebrow">Documentation / v0.4.1</p><h1 id="docs-title">Map the route.<br /><em>Keep the evidence.</em></h1></div>
+        <div><p class="eyebrow">Documentation / v0.4.2</p><h1 id="docs-title">Map the route.<br /><em>Keep the evidence.</em></h1></div>
         <div class="hero-note"><p>FocusPath follows Tab or Shift+Tab navigation in a real Chromium session, records observable focus stops, and produces a portable HTML report.</p><div><a class="action" href="#install">Install</a><a href="https://github.com/damianociarla/focuspath/blob/main/docs/openapi.yml">OpenAPI ↗</a></div></div>
       </section>
 
@@ -73,7 +73,7 @@ const html = generateHtmlReport(report);</code></pre>
             <p>Cross-origin iframes are known to be opaque. A custom element without an open shadow root is only treated as a candidate; FocusPath infers a closed shadow root only when repeated, uncanceled Tab presses keep focus on that host. A canceled Tab event is reported as stalled focus instead. Internal controls cannot be named or positioned, but traversal may continue within the independent Tab budget.</p>
             <p>FocusPath detects missing accessible names, generic roles, positive <code>tabindex</code>, cycles and stalled focus. Element identity comes from Chromium rather than the display selector, so similar deep DOM branches remain distinct.</p>
             <h3>Scrollable containers</h3>
-            <p>A final screenshot cannot truthfully represent every intermediate scroll position. Stops that move an independently scrollable container remain in the ordered table with their recorded scroll state, but are intentionally omitted from the screenshot overlay. FocusPath is evidence for review—not a WCAG certification.</p>
+            <p>A final screenshot cannot truthfully represent every intermediate scroll position. FocusPath follows scrollable ancestors across open shadow roots and same-origin iframe boundaries, including nested iframe viewports and parent-page scrollers. A stop can expose multiple <code>scrollContexts</code>; it remains in the ordered table with every recorded scroll state, but is intentionally omitted from the screenshot overlay. FocusPath is evidence for review—not a WCAG certification.</p>
           </section>
 
           <section id="http-api" aria-labelledby="http-title">

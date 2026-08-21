@@ -100,6 +100,61 @@ describe("focus scanner", () => {
     expect(report.steps.at(-1)?.scrollContext).toBeUndefined();
   });
 
+  it.each(["forward", "reverse"] as const)("records the nested iframe viewport during %s traversal", async (direction) => {
+    const controls = Array.from({ length: 5 }, (_, index) => `<button style="display:block;height:100px">Frame ${index + 1}</button>`).join("");
+    const report = await scanFocusPath(page(`<iframe id="frame" title="Scrollable frame" style="width:320px;height:120px" srcdoc='${controls}'></iframe><a href="#after">After</a>`), {
+      direction,
+      focusSettleMs: 0,
+      viewport: { width: 800, height: 500 },
+    });
+
+    const frameSteps = report.steps.filter((step) => step.accessibleName.startsWith("Frame"));
+    expect(frameSteps).toHaveLength(5);
+    for (const step of frameSteps) {
+      expect(step.scrollContexts).toContainEqual(expect.objectContaining({
+        kind: "viewport",
+        selector: "#frame >>> :viewport",
+      }));
+    }
+    expect(frameSteps.some((step) => step.scrollContexts?.some((context) => context.scrollTop > 0))).toBe(true);
+  });
+
+  it.each(["forward", "reverse"] as const)("finds a parent scroller outside an iframe during %s traversal", async (direction) => {
+    const controls = Array.from({ length: 4 }, (_, index) => `<button style="display:block;height:90px">Frame ${index + 1}</button>`).join("");
+    const report = await scanFocusPath(page(`<div id="outer" style="width:360px;height:120px;overflow:auto"><iframe id="frame" title="Nested frame" style="display:block;width:320px;height:420px" srcdoc='${controls}'></iframe></div><a href="#after">After</a>`), {
+      direction,
+      focusSettleMs: 0,
+      viewport: { width: 800, height: 500 },
+    });
+
+    const frameSteps = report.steps.filter((step) => step.accessibleName.startsWith("Frame"));
+    expect(frameSteps).toHaveLength(4);
+    for (const step of frameSteps) {
+      expect(step.scrollContexts).toContainEqual(expect.objectContaining({ kind: "element", selector: "#outer" }));
+      expect(step.scrollContexts).not.toContainEqual(expect.objectContaining({ kind: "viewport" }));
+    }
+    expect(frameSteps.some((step) => step.scrollContexts?.some((context) => context.selector === "#outer" && context.scrollTop > 0))).toBe(true);
+  });
+
+  it.each(["forward", "reverse"] as const)("records iframe and parent scroll contexts together during %s traversal", async (direction) => {
+    const controls = Array.from({ length: 5 }, (_, index) => `<button style="display:block;height:100px">Frame ${index + 1}</button>`).join("");
+    const report = await scanFocusPath(page(`<div id="outer" style="width:360px;height:80px;overflow:auto"><iframe id="frame" title="Nested scrollable frame" style="display:block;width:320px;height:120px" srcdoc='${controls}'></iframe></div><a href="#after">After</a>`), {
+      direction,
+      focusSettleMs: 0,
+      viewport: { width: 800, height: 500 },
+    });
+
+    const frameSteps = report.steps.filter((step) => step.accessibleName.startsWith("Frame"));
+    expect(frameSteps).toHaveLength(5);
+    for (const step of frameSteps) {
+      expect(step.scrollContexts?.map((context) => [context.kind, context.selector])).toEqual([
+        ["viewport", "#frame >>> :viewport"],
+        ["element", "#outer"],
+      ]);
+      expect(step.scrollContext).toEqual(step.scrollContexts?.[0]);
+    }
+  });
+
   it("handles elements removed while traversal is in progress", async () => {
     const report = await scanFocusPath(page(`<button id="one">One</button><button id="two">Two</button><button id="three">Three</button><script>
       one.addEventListener('focus', () => two.remove());

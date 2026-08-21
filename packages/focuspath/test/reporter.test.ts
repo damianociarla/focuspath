@@ -70,7 +70,15 @@ describe("reporter", () => {
     const html = generateHtmlReport(report);
     expect(html).not.toContain("<g class=\"focus-node\">");
     expect(html).toContain("<strong>1 step is sequence-only.</strong>");
-    expect(html).toContain("Sequence only — inside #scroller at scroll 0, 70");
+    expect(html).toContain("Sequence only — element #scroller at scroll 0, 70");
     expect(html).toContain("<th scope=\"col\">Visual evidence</th>");
+
+    report.steps[0]!.scrollContexts = [
+      { kind: "viewport", selector: "#frame >>> :viewport", scrollLeft: 0, scrollTop: 140 },
+      { kind: "element", selector: "#outer", scrollLeft: 0, scrollTop: 40 },
+    ];
+    const nestedHtml = generateHtmlReport(report);
+    expect(nestedHtml).toContain("viewport #frame &gt;&gt;&gt; :viewport at scroll 0, 140; element #outer at scroll 0, 40");
+    expect(nestedHtml).not.toContain("<g class=\"focus-node\">");
   });
 });
