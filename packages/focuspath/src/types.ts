@@ -1,4 +1,10 @@
-export type IssueKind = "missing-name" | "missing-or-generic-role" | "positive-tabindex" | "focus-stalled" | "opaque-focus-host";
+export type IssueKind = "missing-name" | "missing-or-generic-role" | "positive-tabindex" | "focus-stalled" | "opaque-focus-host" | "opaque-host-limit";
+
+export interface TraversalLimits {
+  maxSteps: number;
+  maxTabPresses: number;
+  maxOpaqueTabPresses: number;
+}
 
 export interface FocusStep {
   index: number;
@@ -34,16 +40,23 @@ export interface FocusReport {
   title: string;
   scannedAt: string;
   durationMs: number;
+  tabPressCount: number;
+  limits: TraversalLimits;
   viewport: { width: number; height: number };
   document: { width: number; height: number };
   steps: FocusStep[];
   issues: FocusIssue[];
   screenshot: string;
-  stoppedBecause: "cycle-complete" | "step-limit" | "no-focusable-elements" | "document-exhausted" | "stalled-on-element";
+  stoppedBecause: "cycle-complete" | "step-limit" | "tab-press-limit" | "opaque-host-limit" | "no-focusable-elements" | "document-exhausted" | "stalled-on-element";
 }
 
 export interface ScanOptions {
+  /** Maximum number of observable focus stops recorded in the report. */
   maxSteps?: number;
+  /** Maximum total Tab key presses, including movement inside opaque hosts. Defaults to maxSteps × 4. */
+  maxTabPresses?: number;
+  /** Maximum repeated Tab presses within one opaque host. Defaults to 100. */
+  maxOpaqueTabPresses?: number;
   viewport?: { width: number; height: number };
   timeoutMs?: number;
   /** Delay after each Tab press before reading focus. Defaults to 75ms. */

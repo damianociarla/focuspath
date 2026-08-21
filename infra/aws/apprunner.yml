@@ -75,6 +75,10 @@ Resources:
                 Value: "1"
               - Name: MAX_FOCUS_STEPS
                 Value: "50"
+              - Name: MAX_TAB_PRESSES
+                Value: "200"
+              - Name: MAX_OPAQUE_TAB_PRESSES
+                Value: "100"
               - Name: SCAN_TIMEOUT_MS
                 Value: "25000"
               - Name: RATE_LIMIT_PER_10_MINUTES

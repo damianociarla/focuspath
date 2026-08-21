@@ -20,7 +20,7 @@ describe("focus scanner", () => {
 
     const stalled = await scanFocusPath(page(`<button>Only</button><script>document.addEventListener('keydown',event=>{if(event.key==='Tab'&&document.activeElement.tagName==='BUTTON')event.preventDefault()})</script>`), { focusSettleMs: 0 });
     expect(stalled.stoppedBecause).toBe("stalled-on-element");
-    expect(stalled.issues).toContainEqual(expect.objectContaining({ kind: "focus-stalled" }));
+    expect(stalled.issues).toContainEqual(expect.objectContaining({ kind: "focus-stalled", step: 1 }));
   });
 
   it("applies the timeout to the complete scan", async () => {
@@ -75,7 +75,7 @@ describe("focus scanner", () => {
     </script>`), { focusSettleMs: 0 });
     expect(report.steps.map((step) => step.accessibleName)).toEqual(["Before", "", "After"]);
     expect(report.issues).toContainEqual(expect.objectContaining({ kind: "opaque-focus-host", selector: "body > secret-control" }));
-    expect(report.issues).not.toContainEqual(expect.objectContaining({ kind: "missing-or-generic-role", selector: "body > secret-control" }));
+    expect(report.issues).toContainEqual(expect.objectContaining({ kind: "missing-or-generic-role", selector: "body > secret-control" }));
     expect(report.issues).not.toContainEqual(expect.objectContaining({ kind: "focus-stalled" }));
     expect(report.stoppedBecause).toBe("document-exhausted");
   });
@@ -95,11 +95,43 @@ describe("focus scanner", () => {
       const root = host.attachShadow({mode:'closed'});
       root.innerHTML = '<button>Private action</button>';
       host.addEventListener('keydown', event => { if (event.key === 'Tab') event.preventDefault(); });
-    </script>`), { focusSettleMs: 0 });
+    </script>`), { focusSettleMs: 0, maxOpaqueTabPresses: 3 });
     expect(report.steps).toHaveLength(1);
     expect(report.issues).toContainEqual(expect.objectContaining({ kind: "opaque-focus-host" }));
-    expect(report.issues).toContainEqual(expect.objectContaining({ kind: "focus-stalled" }));
-    expect(report.stoppedBecause).toBe("stalled-on-element");
+    expect(report.issues).toContainEqual(expect.objectContaining({ kind: "opaque-host-limit", step: 1 }));
+    expect(report.stoppedBecause).toBe("opaque-host-limit");
+    expect(report.tabPressCount).toBe(4);
+    expect(report.limits.maxOpaqueTabPresses).toBe(3);
+  });
+
+  it("does not classify an ordinary focusable custom element as opaque", async () => {
+    const report = await scanFocusPath(page(`<user-chip tabindex="3">Profile</user-chip><button>After</button>`), { focusSettleMs: 0 });
+    expect(report.issues).toContainEqual(expect.objectContaining({ kind: "positive-tabindex", selector: "body > user-chip" }));
+    expect(report.issues).toContainEqual(expect.objectContaining({ kind: "missing-or-generic-role", selector: "body > user-chip" }));
+    expect(report.issues).not.toContainEqual(expect.objectContaining({ kind: "opaque-focus-host" }));
+  });
+
+  it("continues beyond a cross-origin iframe with more than twenty controls", async () => {
+    const controls = Array.from({ length: 21 }, (_, index) => `<button>Frame ${index + 1}</button>`).join("");
+    const frame = page(controls);
+    const report = await scanFocusPath(page(`<button>Before</button><iframe title="Large widget" src="${frame}"></iframe><a href="#after">After</a>`), { focusSettleMs: 0 });
+    expect(report.steps.map((step) => step.accessibleName)).toEqual(["Before", "Large widget", "After"]);
+    expect(report.issues).not.toContainEqual(expect.objectContaining({ kind: "opaque-host-limit" }));
+    expect(report.tabPressCount).toBeGreaterThan(report.steps.length);
+    expect(report.stoppedBecause).toBe("document-exhausted");
+  });
+
+  it("counts all Tab presses and exposes a separate total traversal limit", async () => {
+    const frame = page(Array.from({ length: 10 }, (_, index) => `<button>Frame ${index + 1}</button>`).join(""));
+    const report = await scanFocusPath(page(`<button>Before</button><iframe title="Large widget" src="${frame}"></iframe><a href="#after">After</a>`), {
+      focusSettleMs: 0,
+      maxSteps: 10,
+      maxTabPresses: 5,
+    });
+    expect(report.steps.map((step) => step.accessibleName)).toEqual(["Before", "Large widget"]);
+    expect(report.tabPressCount).toBe(5);
+    expect(report.limits).toEqual({ maxSteps: 10, maxTabPresses: 5, maxOpaqueTabPresses: 100 });
+    expect(report.stoppedBecause).toBe("tab-press-limit");
   });
 
   it("traverses controls in an open dialog", async () => {

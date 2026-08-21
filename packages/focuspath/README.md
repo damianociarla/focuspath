@@ -14,7 +14,9 @@ FocusPath complements manual accessibility testing and established rule engines;
 focuspath <url> [options]
 
 -o, --output <file>          Report path (default: focuspath-report.html)
---max-steps <number>         Maximum Tab presses (default: 50)
+--max-steps <number>         Maximum observed focus stops (default: 50)
+--max-tab-presses <number>   Maximum total Tab presses (default: 4 × max-steps)
+--max-opaque-tab-presses <number> Repeated Tab limit per opaque host (default: 100)
 --viewport <width>x<height>  Browser viewport (default: 1440x900)
 --headed                     Show Chromium while scanning
 ```
@@ -32,6 +34,8 @@ import { generateHtmlReport, scanFocusPath } from "focuspath";
 
 const report = await scanFocusPath("https://example.com", {
   maxSteps: 60,
+  maxTabPresses: 240,
+  maxOpaqueTabPresses: 120,
   focusSettleMs: 100,
   viewport: { width: 1440, height: 900 },
 });
@@ -39,7 +43,7 @@ const report = await scanFocusPath("https://example.com", {
 const html = generateHtmlReport(report);
 ```
 
-The scanner currently targets Chromium. It detects accessible names using Chromium's accessibility tree, positive `tabindex`, repeated focus, and traversal stop conditions. Computed outline and shadow values are recorded for manual review; FocusPath does not claim to automatically verify WCAG focus appearance.
+The scanner currently targets Chromium. `maxSteps` limits observable report entries; `maxTabPresses` counts every Tab key press, including movement inside opaque hosts. Cross-origin frames and detectable closed shadow roots use the independent `maxOpaqueTabPresses` budget. The report exposes the effective limits and an exact stop reason. Computed outline and shadow values are recorded for manual review; FocusPath does not claim to automatically verify WCAG focus appearance.
 
 Repository, documentation, and issue tracker: [github.com/damianociarla/focuspath](https://github.com/damianociarla/focuspath)
 

@@ -44,7 +44,7 @@
         "description": "An open-source visual accessibility scanner that maps keyboard focus order and creates portable HTML reports.",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Any operating system with a modern web browser",
-        "softwareVersion": "0.3.1",
+        "softwareVersion": "0.3.2",
         "license": "https://opensource.org/license/mit",
         "codeRepository": "https://github.com/damianociarla/focuspath",
         "author": {
@@ -66,6 +66,7 @@
       <a class="wordmark" href="#top"><span aria-hidden="true">F</span>FocusPath</a>
       <nav aria-label="Primary navigation">
         <a href="#how">How it works</a>
+        <a href="./docs.html">Documentation</a>
         <a href="https://github.com/damianociarla/focuspath">GitHub ↗</a>
       </nav>
     </header>
@@ -113,7 +114,7 @@
             <details class="scan-notes">
               <summary>Privacy and scan limitations</summary>
               <p>The URL is sent to the FocusPath API on AWS and its page is fetched by Chromium. FocusPath does not intentionally persist page content or reports; infrastructure providers may retain request metadata in operational logs.</p>
-              <p>This beta follows forward Tab navigation in Chromium. It represents cross-origin iframes and closed shadow roots as opaque focus hosts, but cannot inspect their internal controls. It does not certify WCAG conformance or fully cover reverse navigation, platform differences, or focus-indicator contrast.</p>
+              <p>This beta follows forward Tab navigation in Chromium. Cross-origin iframes are opaque; closed shadow roots can only be inferred from repeated focus. FocusPath cannot inspect their internal controls. It does not certify WCAG conformance or fully cover reverse navigation, platform differences, or focus-indicator contrast. <a href="./docs.html#security">Read the limits and privacy notes.</a></p>
             </details>
           </form>
 
@@ -126,7 +127,7 @@
             <div class="scan-progress" data-scan-progress role="status" aria-live="polite" aria-atomic="true" hidden>
               <div class="progress-line"><i></i></div>
               <p data-scan-stage>Opening page…</p>
-              <small>Scanning one page · maximum 50 focus stops</small>
+              <small>One page · up to 50 observed stops · 200 total Tab presses</small>
             </div>
             <div class="scan-error" data-scan-error role="alert" aria-atomic="true" tabindex="-1" hidden>
               <span>Scan failed</span>
@@ -134,7 +135,7 @@
             </div>
             <div class="scan-result" data-scan-result role="region" aria-labelledby="result-title" hidden>
               <div class="result-title"><span data-result-status>Complete</span><h3 id="result-title" data-result-title tabindex="-1"></h3><p data-result-url></p></div>
-              <div class="result-metrics"><div><strong data-result-stops>0</strong><span>Stops</span></div><div><strong data-result-errors>0</strong><span>Errors</span></div><div><strong data-result-warnings>0</strong><span>Warnings</span></div></div>
+              <div class="result-metrics"><div><strong data-result-stops>0</strong><span>Stops</span></div><div><strong data-result-tabs>0</strong><span>Tab presses</span></div><div><strong data-result-errors>0</strong><span>Errors</span></div><div><strong data-result-warnings>0</strong><span>Warnings</span></div></div>
               <ul class="result-issues" data-result-issues></ul>
               <div class="result-actions"><a data-open-report href="#scan" target="_blank" rel="noopener">Open report ↗</a><a data-download-report href="#scan" download="focuspath-report.html">Download HTML ↓</a></div>
             </div>
@@ -182,7 +183,7 @@
         </div>
         <ol class="workflow-list">
           <li><span>01</span><div><h3>Open</h3><p>Chromium loads your page at the viewport you choose.</p></div></li>
-          <li><span>02</span><div><h3>Traverse</h3><p>Every Tab press records the element, name, role and position.</p></div></li>
+          <li><span>02</span><div><h3>Traverse</h3><p>Each observable focus stop records its element, name, role and position. Total Tab movement is counted separately.</p></div></li>
           <li><span>03</span><div><h3>Explain</h3><p>A portable HTML report overlays the path and groups findings.</p></div></li>
         </ol>
       </section>
@@ -197,7 +198,7 @@
       </section>
     </main>
 
-    <footer><a class="wordmark" href="#top"><span aria-hidden="true">F</span>FocusPath</a><p>Built by <a href="https://github.com/damianociarla">Damiano Ciarla</a> for a more navigable web.</p></footer>
+    <footer><a class="wordmark" href="#top"><span aria-hidden="true">F</span>FocusPath</a><nav aria-label="Footer navigation"><a href="./docs.html">Documentation</a><a href="https://github.com/damianociarla/focuspath/blob/main/docs/openapi.yml">OpenAPI</a></nav><p>Built by <a href="https://github.com/damianociarla">Damiano Ciarla</a> for a more navigable web.</p></footer>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

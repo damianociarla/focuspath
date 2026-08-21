@@ -14,6 +14,8 @@ describe("reporter", () => {
       title: "Example",
       scannedAt: "2026-08-20T00:00:00.000Z",
       durationMs: 120,
+      tabPressCount: 2,
+      limits: { maxSteps: 50, maxTabPresses: 200, maxOpaqueTabPresses: 100 },
       viewport: { width: 1000, height: 700 },
       document: { width: 1000, height: 1200 },
       screenshot: "data:image/jpeg;base64,test",
@@ -30,5 +32,7 @@ describe("reporter", () => {
     expect(html).toContain("<caption class=\"sr-only\">Focus stops in keyboard traversal order</caption>");
     expect(html).toContain("<th scope=\"row\">1</th>");
     expect(html).toContain("aria-hidden=\"true\" focusable=\"false\"");
+    expect(html).toContain("<dt>Tab presses</dt><dd>2</dd>");
+    expect(html).toContain("limits: 50 stops / 200 Tab presses / 100 per opaque host");
   });
 });

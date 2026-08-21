@@ -76,7 +76,9 @@ The API restricts URLs, revalidates browser requests, runs as a non-root user, l
 |---|---:|---|
 | `ALLOWED_ORIGINS` | FocusPath Pages + localhost | Comma-separated CORS allowlist |
 | `MAX_CONCURRENT_SCANS` | `2` | Browser processes per API instance |
-| `MAX_FOCUS_STEPS` | `50` | Maximum Tab presses |
+| `MAX_FOCUS_STEPS` | `50` | Maximum observable focus stops recorded |
+| `MAX_TAB_PRESSES` | `200` | Maximum total Tab presses, including opaque hosts |
+| `MAX_OPAQUE_TAB_PRESSES` | `100` | Maximum repeated Tab presses within one opaque host |
 | `SCAN_TIMEOUT_MS` | `25000` | Page navigation timeout |
 | `RATE_LIMIT_PER_10_MINUTES` | `4` | In-memory beta limit per client |
 | `GLOBAL_RATE_LIMIT_PER_HOUR` | `60` | Maximum accepted scans across the instance per hour |

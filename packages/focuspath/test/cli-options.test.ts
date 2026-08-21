@@ -9,8 +9,10 @@ describe("CLI options", () => {
   });
 
   it("supports options after the URL", () => {
-    const parsed = parseCliOptions(["https://example.com", "--max-steps", "20", "--viewport", "390x844"]);
+    const parsed = parseCliOptions(["https://example.com", "--max-steps", "20", "--max-tab-presses", "120", "--max-opaque-tab-presses", "80", "--viewport", "390x844"]);
     expect(parsed.maxSteps).toBe(20);
+    expect(parsed.maxTabPresses).toBe(120);
+    expect(parsed.maxOpaqueTabPresses).toBe(80);
     expect(parsed.viewport).toEqual({ width: 390, height: 844 });
   });
 
@@ -21,5 +23,15 @@ describe("CLI options", () => {
 
   it("rejects an explicit non-HTTP protocol", () => {
     expect(() => parseCliOptions(["ftp://example.com"])).toThrow(/Only http and https/);
+  });
+
+  it("derives a total Tab budget from the observed step limit", () => {
+    const parsed = parseCliOptions(["example.com", "--max-steps", "30"]);
+    expect(parsed.maxTabPresses).toBe(120);
+  });
+
+  it("rejects invalid traversal budgets", () => {
+    expect(() => parseCliOptions(["example.com", "--max-tab-presses", "0"])).toThrow(/max-tab-presses/);
+    expect(() => parseCliOptions(["example.com", "--max-opaque-tab-presses", "nope"])).toThrow(/max-opaque-tab-presses/);
   });
 });

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FocusPath Live Scanner API
-  version: 0.3.1
+  version: 0.3.2
   description: Rate-limited public demo API; not a general-purpose scanning service.
 paths:
   /health:
@@ -14,9 +14,10 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [status, activeScans]
+                required: [status, version, activeScans]
                 properties:
                   status: { const: ok }
+                  version: { type: string }
                   activeScans: { type: integer, minimum: 0 }
   /v1/scans:
     post:
@@ -53,12 +54,15 @@ components:
     ScanResponse:
       type: object
       additionalProperties: false
-      required: [url, title, scannedAt, durationMs, stoppedBecause, steps, issues, reportHtml]
+      required: [url, title, scannedAt, durationMs, engineVersion, tabPressCount, limits, stoppedBecause, steps, issues, reportHtml]
       properties:
         url: { type: string, format: uri }
         title: { type: string }
         scannedAt: { type: string, format: date-time }
         durationMs: { type: integer, minimum: 0 }
+        engineVersion: { type: string }
+        tabPressCount: { type: integer, minimum: 0 }
+        limits: { $ref: "#/components/schemas/TraversalLimits" }
         stoppedBecause: { $ref: "#/components/schemas/StopReason" }
         steps:
           type: array
@@ -69,7 +73,15 @@ components:
         reportHtml: { type: string }
     StopReason:
       type: string
-      enum: [cycle-complete, step-limit, no-focusable-elements, document-exhausted, stalled-on-element]
+      enum: [cycle-complete, step-limit, tab-press-limit, opaque-host-limit, no-focusable-elements, document-exhausted, stalled-on-element]
+    TraversalLimits:
+      type: object
+      additionalProperties: false
+      required: [maxSteps, maxTabPresses, maxOpaqueTabPresses]
+      properties:
+        maxSteps: { type: integer, minimum: 1 }
+        maxTabPresses: { type: integer, minimum: 1 }
+        maxOpaqueTabPresses: { type: integer, minimum: 1 }
     FocusStep:
       type: object
       additionalProperties: false
@@ -107,7 +119,7 @@ components:
       properties:
         kind:
           type: string
-          enum: [missing-name, missing-or-generic-role, positive-tabindex, focus-stalled, opaque-focus-host]
+          enum: [missing-name, missing-or-generic-role, positive-tabindex, focus-stalled, opaque-focus-host, opaque-host-limit]
         severity: { type: string, enum: [error, warning] }
         step: { type: integer, minimum: 1 }
         selector: { type: string }

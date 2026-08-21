@@ -13,7 +13,9 @@ Usage:
 
 Options:
   -o, --output <file>      HTML report path (default: focuspath-report.html)
-  --max-steps <number>     Maximum Tab presses (default: 50)
+  --max-steps <number>     Maximum observed focus stops (default: 50)
+  --max-tab-presses <n>    Maximum total Tab presses (default: 4 × max-steps)
+  --max-opaque-tab-presses <n> Repeated Tab limit per opaque host (default: 100)
   --viewport <width>x<height> (default: 1440x900)
   --headed                 Show the browser while scanning
   -h, --help               Show this help
@@ -34,11 +36,17 @@ async function main(): Promise<void> {
 
   const output = resolve(options.output);
   console.log(`Scanning ${options.url}`);
-  const report = await scanFocusPath(options.url, { maxSteps: options.maxSteps, viewport: options.viewport, headless: !options.headed });
+  const report = await scanFocusPath(options.url, {
+    maxSteps: options.maxSteps,
+    maxTabPresses: options.maxTabPresses,
+    maxOpaqueTabPresses: options.maxOpaqueTabPresses,
+    viewport: options.viewport,
+    headless: !options.headed,
+  });
   await writeFile(output, generateHtmlReport(report), "utf8");
   const errors = report.issues.filter((issue) => issue.severity === "error").length;
   const warnings = report.issues.filter((issue) => issue.severity === "warning").length;
-  console.log(`✓ ${report.steps.length} focus stops · ${errors} errors · ${warnings} warnings`);
+  console.log(`✓ ${report.steps.length} focus stops · ${report.tabPressCount} Tab presses · ${errors} errors · ${warnings} warnings`);
   console.log(`Report: ${output}`);
   if (errors > 0) process.exitCode = 1;
 }
