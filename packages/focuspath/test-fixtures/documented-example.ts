@@ -5,6 +5,7 @@ export async function createFocusPathReport(url: string): Promise<string> {
     maxSteps: 50,
     maxTabPresses: 200,
     maxOpaqueTabPresses: 100,
+    direction: "reverse",
     timeoutMs: 30_000,
   });
 

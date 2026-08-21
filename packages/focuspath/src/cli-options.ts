@@ -1,4 +1,5 @@
 import { parseArgs } from "node:util";
+import type { TraversalDirection } from "./types.js";
 
 export interface CliOptions {
   url: string;
@@ -6,6 +7,7 @@ export interface CliOptions {
   maxSteps: number;
   maxTabPresses: number;
   maxOpaqueTabPresses: number;
+  direction: TraversalDirection;
   viewport: { width: number; height: number };
   headed: boolean;
   help: boolean;
@@ -21,13 +23,14 @@ export function parseCliOptions(args: string[]): CliOptions {
       "max-steps": { type: "string", default: "50" },
       "max-tab-presses": { type: "string" },
       "max-opaque-tab-presses": { type: "string", default: "100" },
+      direction: { type: "string", default: "forward" },
       viewport: { type: "string", default: "1440x900" },
       headed: { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
     },
   });
 
-  if (values.help) return { url: "", output: values.output, maxSteps: 50, maxTabPresses: 200, maxOpaqueTabPresses: 100, viewport: { width: 1440, height: 900 }, headed: values.headed, help: true };
+  if (values.help) return { url: "", output: values.output, maxSteps: 50, maxTabPresses: 200, maxOpaqueTabPresses: 100, direction: "forward", viewport: { width: 1440, height: 900 }, headed: values.headed, help: true };
   if (positionals.length === 0) throw new Error("Missing URL. Run focuspath --help for usage.");
   if (positionals.length > 1) throw new Error(`Unexpected argument: ${positionals[1]}`);
 
@@ -37,6 +40,8 @@ export function parseCliOptions(args: string[]): CliOptions {
   if (!Number.isInteger(maxTabPresses) || maxTabPresses < 1 || maxTabPresses > 10_000) throw new Error("--max-tab-presses must be an integer between 1 and 10000.");
   const maxOpaqueTabPresses = Number(values["max-opaque-tab-presses"]);
   if (!Number.isInteger(maxOpaqueTabPresses) || maxOpaqueTabPresses < 1 || maxOpaqueTabPresses > 5_000) throw new Error("--max-opaque-tab-presses must be an integer between 1 and 5000.");
+  const direction = values.direction;
+  if (direction !== "forward" && direction !== "reverse") throw new Error("--direction must be either forward or reverse.");
 
   return {
     url: normalizeUrl(positionals[0] ?? ""),
@@ -44,6 +49,7 @@ export function parseCliOptions(args: string[]): CliOptions {
     maxSteps,
     maxTabPresses,
     maxOpaqueTabPresses,
+    direction,
     viewport: parseViewport(values.viewport),
     headed: values.headed,
     help: false,
