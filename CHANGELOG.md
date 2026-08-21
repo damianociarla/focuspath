@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1
+
+- Continue keyboard traversal beyond cross-origin iframes and closed shadow roots with bounded opaque-host handling.
+- Report opaque focus hosts explicitly instead of misclassifying internal focus movement as a stall.
+- Cover CORS, origin verification, quotas, capacity, and timeout HTTP responses end to end.
+- Align the OpenAPI URL input and configurable result limits with runtime behavior.
+
 ## 0.3.0
 
 - Distinguish focusable elements with generic roles from named controls.

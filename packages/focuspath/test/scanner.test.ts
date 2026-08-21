@@ -68,13 +68,38 @@ describe("focus scanner", () => {
     expect(report.stoppedBecause).toBe("document-exhausted");
   });
 
-  it("handles a closed shadow root as an intentionally opaque focus host", async () => {
-    const report = await scanFocusPath(page(`<secret-control></secret-control><script>
+  it("continues beyond multiple controls in a closed shadow root", async () => {
+    const report = await scanFocusPath(page(`<button>Before</button><secret-control></secret-control><a href="#after">After</a><script>
       const root = document.querySelector('secret-control').attachShadow({mode:'closed'});
+      root.innerHTML = '<button>Private one</button><button>Private two</button>';
+    </script>`), { focusSettleMs: 0 });
+    expect(report.steps.map((step) => step.accessibleName)).toEqual(["Before", "", "After"]);
+    expect(report.issues).toContainEqual(expect.objectContaining({ kind: "opaque-focus-host", selector: "body > secret-control" }));
+    expect(report.issues).not.toContainEqual(expect.objectContaining({ kind: "missing-or-generic-role", selector: "body > secret-control" }));
+    expect(report.issues).not.toContainEqual(expect.objectContaining({ kind: "focus-stalled" }));
+    expect(report.stoppedBecause).toBe("document-exhausted");
+  });
+
+  it("continues beyond multiple controls in a cross-origin iframe", async () => {
+    const frame = page(`<button>Frame one</button><button>Frame two</button>`);
+    const report = await scanFocusPath(page(`<button>Before</button><iframe title="External tools" src="${frame}"></iframe><a href="#after">After</a>`), { focusSettleMs: 0 });
+    expect(report.steps.map((step) => step.accessibleName)).toEqual(["Before", "External tools", "After"]);
+    expect(report.issues).toContainEqual(expect.objectContaining({ kind: "opaque-focus-host", selector: "body > iframe" }));
+    expect(report.issues).not.toContainEqual(expect.objectContaining({ kind: "focus-stalled" }));
+    expect(report.stoppedBecause).toBe("document-exhausted");
+  });
+
+  it("bounds traversal when focus cannot leave an opaque host", async () => {
+    const report = await scanFocusPath(page(`<secret-control></secret-control><script>
+      const host = document.querySelector('secret-control');
+      const root = host.attachShadow({mode:'closed'});
       root.innerHTML = '<button>Private action</button>';
+      host.addEventListener('keydown', event => { if (event.key === 'Tab') event.preventDefault(); });
     </script>`), { focusSettleMs: 0 });
     expect(report.steps).toHaveLength(1);
-    expect(report.steps[0]?.selector).toBe("body > secret-control");
+    expect(report.issues).toContainEqual(expect.objectContaining({ kind: "opaque-focus-host" }));
+    expect(report.issues).toContainEqual(expect.objectContaining({ kind: "focus-stalled" }));
+    expect(report.stoppedBecause).toBe("stalled-on-element");
   });
 
   it("traverses controls in an open dialog", async () => {

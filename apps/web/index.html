@@ -44,7 +44,7 @@
         "description": "An open-source visual accessibility scanner that maps keyboard focus order and creates portable HTML reports.",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Any operating system with a modern web browser",
-        "softwareVersion": "0.3.0",
+        "softwareVersion": "0.3.1",
         "license": "https://opensource.org/license/mit",
         "codeRepository": "https://github.com/damianociarla/focuspath",
         "author": {
@@ -113,7 +113,7 @@
             <details class="scan-notes">
               <summary>Privacy and scan limitations</summary>
               <p>The URL is sent to the FocusPath API on AWS and its page is fetched by Chromium. FocusPath does not intentionally persist page content or reports; infrastructure providers may retain request metadata in operational logs.</p>
-              <p>This beta follows forward Tab navigation in Chromium. It does not certify WCAG conformance or fully cover cross-origin iframes, closed shadow roots, reverse navigation, platform differences, or focus-indicator contrast.</p>
+              <p>This beta follows forward Tab navigation in Chromium. It represents cross-origin iframes and closed shadow roots as opaque focus hosts, but cannot inspect their internal controls. It does not certify WCAG conformance or fully cover reverse navigation, platform differences, or focus-indicator contrast.</p>
             </details>
           </form>
 
