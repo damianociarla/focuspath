@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 
 const root = new URL("../", import.meta.url);
 const roleTemplate = await readFile(new URL("infra/aws/github-deploy-role.yml", root), "utf8");
+const applicationTemplate = await readFile(new URL("infra/aws/apprunner.yml", root), "utf8");
 const releaseWorkflow = await readFile(new URL(".github/workflows/release.yml", root), "utf8");
 const workflowFiles = await Promise.all([
   ".github/workflows/ci.yml",
@@ -20,6 +21,14 @@ assert.match(
   /Action: iam:PassRole\n\s+Resource: !Sub "arn:\$\{AWS::Partition\}:iam::\$\{AWS::AccountId\}:role\/\$\{ApplicationRoleName\}"/,
   "PassRole must remain scoped to the exact FocusPath application role.",
 );
+for (const logicalId of ["ApiAutoScaling", "ApiService"]) {
+  const resourceStart = applicationTemplate.indexOf(`  ${logicalId}:`);
+  const nextResource = [...applicationTemplate.matchAll(/^  [A-Za-z0-9]+:\n/gm)]
+    .map((match) => match.index ?? -1)
+    .find((index) => index > resourceStart);
+  const resource = applicationTemplate.slice(resourceStart, nextResource);
+  assert(!/^\s+Tags:/m.test(resource), `${logicalId} tags trigger an unsafe App Runner replacement.`);
+}
 
 const deployIndex = releaseWorkflow.indexOf("  deploy-api:");
 const publishIndex = releaseWorkflow.indexOf("  publish-npm:");

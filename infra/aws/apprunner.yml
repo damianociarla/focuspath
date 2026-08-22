@@ -55,9 +55,6 @@ Resources:
       MaxConcurrency: 10
       MaxSize: 1
       MinSize: 1
-      Tags:
-        - Key: Project
-          Value: FocusPath
 
   ApiService:
     Type: AWS::AppRunner::Service
@@ -104,9 +101,6 @@ Resources:
         Timeout: 5
         HealthyThreshold: 1
         UnhealthyThreshold: 5
-      Tags:
-        - Key: Project
-          Value: FocusPath
 
   ApiDistribution:
     Type: AWS::CloudFront::Distribution
