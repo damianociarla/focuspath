@@ -16,6 +16,9 @@ Options:
   --max-steps <number>     Maximum observed focus stops (default: 50)
   --max-tab-presses <n>    Maximum total Tab presses (default: 4 × max-steps)
   --max-opaque-tab-presses <n> Repeated Tab limit per opaque host (default: 100)
+  --max-requests <number>  Maximum page requests (default: 500; max: 10000)
+  --max-screenshot-height <px> Screenshot height budget (default: 20000; max: 100000)
+  --unlimited              Explicitly remove request and screenshot-height limits
   --direction <forward|reverse> Keyboard traversal direction (default: forward)
   --viewport <width>x<height> (default: 1440x900)
   --headed                 Show the browser while scanning
@@ -41,6 +44,8 @@ async function main(): Promise<void> {
     maxSteps: options.maxSteps,
     maxTabPresses: options.maxTabPresses,
     maxOpaqueTabPresses: options.maxOpaqueTabPresses,
+    maxRequests: options.maxRequests,
+    maxScreenshotHeight: options.maxScreenshotHeight,
     direction: options.direction,
     viewport: options.viewport,
     headless: !options.headed,

@@ -1,7 +1,7 @@
 {
   "name": "focuspath-monorepo",
   "private": true,
-  "version": "0.5.1",
+  "version": "0.6.0",
   "type": "module",
   "workspaces": [
     "apps/*",
@@ -13,7 +13,8 @@
     "dev:api": "npm run dev --workspace @focuspath/api",
     "test": "npm test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "docs:check": "npm run docs:check --workspace focuspath"
+    "docs:check": "npm run docs:check --workspace focuspath",
+    "infra:check": "node scripts/check-infra.mjs"
   },
   "engines": {
     "node": ">=24"

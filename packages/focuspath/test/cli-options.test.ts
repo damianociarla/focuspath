@@ -9,10 +9,12 @@ describe("CLI options", () => {
   });
 
   it("supports options after the URL", () => {
-    const parsed = parseCliOptions(["https://example.com", "--max-steps", "20", "--max-tab-presses", "120", "--max-opaque-tab-presses", "80", "--direction", "reverse", "--viewport", "390x844"]);
+    const parsed = parseCliOptions(["https://example.com", "--max-steps", "20", "--max-tab-presses", "120", "--max-opaque-tab-presses", "80", "--max-requests", "240", "--max-screenshot-height", "12000", "--direction", "reverse", "--viewport", "390x844"]);
     expect(parsed.maxSteps).toBe(20);
     expect(parsed.maxTabPresses).toBe(120);
     expect(parsed.maxOpaqueTabPresses).toBe(80);
+    expect(parsed.maxRequests).toBe(240);
+    expect(parsed.maxScreenshotHeight).toBe(12_000);
     expect(parsed.direction).toBe("reverse");
     expect(parsed.viewport).toEqual({ width: 390, height: 844 });
   });
@@ -30,11 +32,22 @@ describe("CLI options", () => {
     const parsed = parseCliOptions(["example.com", "--max-steps", "30"]);
     expect(parsed.maxTabPresses).toBe(120);
     expect(parsed.direction).toBe("forward");
+    expect(parsed.maxRequests).toBe(500);
+    expect(parsed.maxScreenshotHeight).toBe(20_000);
+  });
+
+  it("requires an explicit unlimited profile", () => {
+    const parsed = parseCliOptions(["example.com", "--unlimited"]);
+    expect(parsed.maxRequests).toBe(Number.POSITIVE_INFINITY);
+    expect(parsed.maxScreenshotHeight).toBe(Number.POSITIVE_INFINITY);
+    expect(() => parseCliOptions(["example.com", "--unlimited", "--max-requests", "10"])).toThrow(/cannot be combined/);
   });
 
   it("rejects invalid traversal budgets", () => {
     expect(() => parseCliOptions(["example.com", "--max-tab-presses", "0"])).toThrow(/max-tab-presses/);
     expect(() => parseCliOptions(["example.com", "--max-opaque-tab-presses", "nope"])).toThrow(/max-opaque-tab-presses/);
     expect(() => parseCliOptions(["example.com", "--direction", "sideways"])).toThrow(/direction/);
+    expect(() => parseCliOptions(["example.com", "--max-requests", "0"])).toThrow(/max-requests/);
+    expect(() => parseCliOptions(["example.com", "--max-screenshot-height", "100001"])).toThrow(/max-screenshot-height/);
   });
 });

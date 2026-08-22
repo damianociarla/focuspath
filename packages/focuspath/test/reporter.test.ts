@@ -19,6 +19,7 @@ describe("reporter", () => {
       limits: { maxSteps: 50, maxTabPresses: 200, maxOpaqueTabPresses: 100 },
       viewport: { width: 1000, height: 700 },
       document: { width: 1000, height: 1200 },
+      capture: { sourceWidth: 1000, sourceHeight: 2400, truncated: true },
       network: { requestCount: 12, blockedRequestCount: 3, blockedResourceTypes: ["font", "media"] },
       screenshot: "data:image/jpeg;base64,test",
       stoppedBecause: "cycle-complete",
@@ -39,6 +40,8 @@ describe("reporter", () => {
     expect(html).toContain("limits: 50 stops / 200 Tab presses / 100 per opaque host");
     expect(html).toContain("Rendered with network restrictions.");
     expect(html).toContain("3 requests were blocked");
+    expect(html).toContain("Screenshot capture was truncated.");
+    expect(html).toContain("1200px of a 2400px document");
   });
 
   it("does not place scroll-container steps over a different screenshot state", () => {

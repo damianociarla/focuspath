@@ -15,7 +15,12 @@ export function buildScanResponse(report: FocusReport, engineVersion: string, fo
     tabPressCount: report.tabPressCount,
     limits: report.limits,
     viewport: report.viewport,
-    capture: report.document,
+    capture: {
+      ...report.document,
+      sourceWidth: report.capture?.sourceWidth ?? report.document.width,
+      sourceHeight: report.capture?.sourceHeight ?? report.document.height,
+      truncated: report.capture?.truncated ?? false,
+    },
     network: report.network,
     stoppedBecause: report.stoppedBecause,
     steps: report.steps,

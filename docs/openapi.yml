@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FocusPath Live Scanner API
-  version: 0.5.1
+  version: 0.6.0
   description: Rate-limited public demo API; not a general-purpose scanning service.
 paths:
   /health:
@@ -58,8 +58,8 @@ components:
   schemas:
     ScanResponse:
       type: object
-      additionalProperties: false
-      required: [reportVersion, engineVersion, responseFormat, url, title, scannedAt, durationMs, direction, tabPressCount, limits, viewport, capture, network, stoppedBecause, steps, issues]
+      description: Evolutionary response. Clients must ignore unknown properties; additive optional fields may appear within v1.
+      required: [reportVersion, engineVersion, responseFormat, url, title, scannedAt, durationMs, direction, tabPressCount, limits, viewport, capture, stoppedBecause, steps, issues]
       oneOf:
         - properties:
             responseFormat: { const: html }
@@ -70,7 +70,7 @@ components:
           required: [screenshot]
           not: { required: [reportHtml] }
       properties:
-        reportVersion: { type: integer, const: 3 }
+        reportVersion: { type: integer, const: 4 }
         engineVersion: { type: string }
         responseFormat: { type: string, enum: [html, structured] }
         url: { type: string, format: uri }
@@ -83,7 +83,7 @@ components:
         viewport: { $ref: "#/components/schemas/Size" }
         capture:
           description: Pixel dimensions of the JPEG used by the visual evidence overlay.
-          $ref: "#/components/schemas/Size"
+          $ref: "#/components/schemas/CaptureSummary"
         network: { $ref: "#/components/schemas/NetworkSummary" }
         stoppedBecause: { $ref: "#/components/schemas/StopReason" }
         steps:
@@ -101,14 +101,21 @@ components:
           description: Screenshot data URL returned only when format is structured.
     Size:
       type: object
-      additionalProperties: false
       required: [width, height]
       properties:
         width: { type: integer, minimum: 1 }
         height: { type: integer, minimum: 1 }
+    CaptureSummary:
+      allOf:
+        - $ref: "#/components/schemas/Size"
+        - type: object
+          required: [sourceWidth, sourceHeight, truncated]
+          properties:
+            sourceWidth: { type: integer, minimum: 1 }
+            sourceHeight: { type: integer, minimum: 1 }
+            truncated: { type: boolean }
     NetworkSummary:
       type: object
-      additionalProperties: false
       required: [requestCount, blockedRequestCount, blockedResourceTypes]
       properties:
         requestCount: { type: integer, minimum: 0 }
@@ -121,7 +128,6 @@ components:
       enum: [cycle-complete, step-limit, tab-press-limit, opaque-host-limit, no-focusable-elements, document-exhausted, stalled-on-element]
     TraversalLimits:
       type: object
-      additionalProperties: false
       required: [maxSteps, maxTabPresses, maxOpaqueTabPresses]
       properties:
         maxSteps: { type: integer, minimum: 1 }
@@ -129,7 +135,6 @@ components:
         maxOpaqueTabPresses: { type: integer, minimum: 1 }
     FocusStep:
       type: object
-      additionalProperties: false
       required: [index, selector, tagName, role, accessibleName, tabIndex, href, rect, focusIndicator]
       properties:
         index: { type: integer, minimum: 1 }
@@ -161,7 +166,6 @@ components:
           $ref: "#/components/schemas/ScrollContext"
     Rect:
       type: object
-      additionalProperties: false
       required: [x, y, width, height]
       properties:
         x: { type: number }
@@ -170,14 +174,12 @@ components:
         height: { type: number, minimum: 0 }
     FocusStyles:
       type: object
-      additionalProperties: false
       required: [outline, boxShadow]
       properties:
         outline: { type: string }
         boxShadow: { type: string }
     VisualEvidence:
       type: object
-      additionalProperties: false
       required: [status]
       properties:
         status:
@@ -188,7 +190,6 @@ components:
           enum: [scroll-or-clipping-context, geometry-unavailable]
     ScrollContext:
       type: object
-      additionalProperties: false
       required: [selector, scrollLeft, scrollTop]
       properties:
         kind: { type: string, enum: [element, viewport], default: element }
@@ -197,7 +198,6 @@ components:
         scrollTop: { type: number }
     FocusIssue:
       type: object
-      additionalProperties: false
       required: [kind, severity, step, selector, message]
       properties:
         kind:
@@ -209,7 +209,6 @@ components:
         message: { type: string }
     Error:
       type: object
-      additionalProperties: false
       required: [error]
       properties:
         error: { type: string }

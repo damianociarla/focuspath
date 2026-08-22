@@ -19,7 +19,7 @@ describe("HTTP API", () => {
     const response = await fetch(`${baseUrl}/health`);
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(await response.json()).toEqual({ status: "ok", version: "0.5.1", activeScans: 0 });
+    expect(await response.json()).toEqual({ status: "ok", version: "0.6.0", activeScans: 0 });
   });
 
   it("enforces JSON content type", async () => {
@@ -106,7 +106,7 @@ describe("HTTP API", () => {
   it("maps client quotas and scanner capacity to retryable responses", async () => {
     const rateLimited = await startApi({ RATE_LIMIT_PER_10_MINUTES: "0" });
     const preflightLimited = await startApi({ PREFLIGHT_RATE_LIMIT_PER_MINUTE: "0" });
-    const atCapacity = await startApi({ MAX_CONCURRENT_SCANS: "0" });
+    const atCapacity = await startApi({ MAX_CONCURRENT_SCANS: "0", RATE_LIMIT_PER_10_MINUTES: "1" });
     try {
       const quota = await postScan(rateLimited.baseUrl, "https://example.com");
       expect(quota.status).toBe(429);
@@ -120,6 +120,9 @@ describe("HTTP API", () => {
       const capacity = await postScan(atCapacity.baseUrl, "https://example.com");
       expect(capacity.status).toBe(503);
       expect(capacity.headers.get("retry-after")).toBe("15");
+      const capacityRetry = await postScan(atCapacity.baseUrl, "https://example.com");
+      expect(capacityRetry.status).toBe(503);
+      expect(capacityRetry.headers.get("retry-after")).toBe("15");
     } finally {
       await Promise.all([stopApi(rateLimited.process), stopApi(preflightLimited.process), stopApi(atCapacity.process)]);
     }

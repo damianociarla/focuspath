@@ -11,7 +11,7 @@ describe("focus scanner", () => {
       direction: "reverse",
       focusSettleMs: 0,
     });
-    expect(report.version).toBe(3);
+    expect(report.version).toBe(4);
     expect(report.direction).toBe("reverse");
     expect(report.steps.map((step) => step.accessibleName)).toEqual(["Third", "Second", "First"]);
     expect(report.tabPressCount).toBe(4);
@@ -125,8 +125,23 @@ describe("focus scanner", () => {
     });
 
     expect(report.document.height).toBe(5_000);
+    expect(report.capture).toEqual(expect.objectContaining({ truncated: true }));
+    expect(report.capture?.sourceHeight).toBeGreaterThan(5_000);
     expect(report.steps[0]?.visualEvidence).toEqual({ status: "plotted" });
     expect(report.steps[1]?.visualEvidence).toEqual({ status: "outside-capture" });
+  });
+
+  it("uses safe request and screenshot budgets by default", async () => {
+    const report = await scanFocusPath(page(`<button>First</button><div style="height:21000px"></div><button>Last</button>`), {
+      focusSettleMs: 0,
+      viewport: { width: 320, height: 320 },
+    });
+
+    expect(report.version).toBe(4);
+    expect(report.document.height).toBe(20_000);
+    expect(report.capture).toEqual(expect.objectContaining({ truncated: true }));
+    await expect(scanFocusPath(page(`<button>Invalid</button>`), { maxRequests: 0 })).rejects.toThrow(/maxRequests/);
+    await expect(scanFocusPath(page(`<button>Invalid</button>`), { maxScreenshotHeight: 0 })).rejects.toThrow(/maxScreenshotHeight/);
   });
 
   it.each(["forward", "reverse"] as const)("uses transformed iframe quads during %s traversal", async (direction) => {

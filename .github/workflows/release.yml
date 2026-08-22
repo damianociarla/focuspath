@@ -4,54 +4,71 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to recover or retry
+        required: true
+        type: string
 
-permissions:
-  contents: write
-  id-token: write
-  pages: write
+permissions: {}
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
 
 jobs:
-  publish:
+  validate:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
-          package-manager-cache: false
-      - run: npm install --global npm@11
+          cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: node scripts/check-release.mjs
+      - run: node scripts/check-release.mjs "${RELEASE_TAG}"
       - run: npm test
       - run: npm run typecheck
       - run: npm run build
       - run: npm run dev:check --workspace focuspath
       - run: npm run docs:check
       - run: npm run pack:check --workspace focuspath
+      - run: npm run infra:check
       - name: Verify installable tarball
         run: |
           package_tarball="$(npm pack --workspace focuspath --json | node -e "let value='';process.stdin.on('data',chunk=>value+=chunk).on('end',()=>console.log(JSON.parse(value)[0].filename))")"
           install_dir="$(mktemp -d)"
           npm install --prefix "$install_dir" "./$package_tarball"
           "$install_dir/node_modules/.bin/focuspath" --help
-      - run: npm publish --workspace focuspath
 
   deploy-api:
-    needs: publish
+    needs: validate
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: aws-actions/configure-aws-credentials@v6.2.3
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: eu-west-1
           allowed-account-ids: ${{ vars.AWS_ACCOUNT_ID }}
-      - name: Deploy immutable API image
+      - name: Deploy or reuse immutable API image
         env:
           AWS_REGION: eu-west-1
-          FOCUSPATH_IMAGE_TAG: ${{ github.ref_name }}
+          FOCUSPATH_IMAGE_TAG: ${{ env.RELEASE_TAG }}
           FOCUSPATH_ORIGIN_VERIFY_TOKEN: ${{ secrets.FOCUSPATH_ORIGIN_VERIFY_TOKEN }}
           FOCUSPATH_CLOUDFORMATION_ROLE_ARN: ${{ vars.AWS_CLOUDFORMATION_ROLE_ARN }}
         run: ./infra/aws/deploy-app-runner.sh
@@ -59,7 +76,7 @@ jobs:
         env:
           API_URL: ${{ vars.VITE_API_URL }}
         run: |
-          expected="${GITHUB_REF_NAME#v}"
+          expected="${RELEASE_TAG#v}"
           for attempt in $(seq 1 30); do
             actual="$(curl --fail --silent --show-error "${API_URL}/health" | node -e "let body='';process.stdin.on('data',chunk=>body+=chunk).on('end',()=>console.log(JSON.parse(body).version))" || true)"
             if [[ "${actual}" == "${expected}" ]]; then exit 0; fi
@@ -68,15 +85,53 @@ jobs:
           echo "API did not report expected version ${expected}." >&2
           exit 1
 
-  deploy-site:
+  publish-npm:
     needs: deploy-api
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - run: npm install --global npm@11
+      - run: npm ci
+      - name: Publish or verify existing npm package
+        run: |
+          version="${RELEASE_TAG#v}"
+          expected_commit="$(git rev-parse HEAD)"
+          published_commit="$(npm view "focuspath@${version}" gitHead --json 2>/dev/null | tr -d '"' || true)"
+          if [[ -n "${published_commit}" ]]; then
+            if [[ "${published_commit}" != "${expected_commit}" ]]; then
+              echo "focuspath@${version} exists for a different commit." >&2
+              exit 1
+            fi
+            echo "focuspath@${version} already matches ${expected_commit}; skipping publish."
+            exit 0
+          fi
+          npm publish --workspace focuspath
+
+  deploy-site:
+    needs: publish-npm
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 24
           cache: npm
@@ -84,20 +139,29 @@ jobs:
       - run: npm run build --workspace @focuspath/web
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
-      - uses: actions/configure-pages@v6
-      - uses: actions/upload-pages-artifact@v5
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: apps/web/dist
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
 
   github-release:
     needs: deploy-site
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - name: Create GitHub release
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - name: Create or verify GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" --verify-tag --title "FocusPath ${GITHUB_REF_NAME}" --generate-notes
+        run: |
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "GitHub Release ${RELEASE_TAG} already exists."
+          else
+            gh release create "${RELEASE_TAG}" --verify-tag --title "FocusPath ${RELEASE_TAG}" --generate-notes
+          fi

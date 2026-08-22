@@ -34,6 +34,7 @@ Resources:
   AppRunnerEcrAccessRole:
     Type: AWS::IAM::Role
     Properties:
+      PermissionsBoundary: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/focuspath-application-role-boundary"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -41,8 +42,24 @@ Resources:
             Principal:
               Service: build.apprunner.amazonaws.com
             Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess
+      Policies:
+        - PolicyName: FocusPathEcrRead
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                  - ecr:DescribeImages
+                  - ecr:BatchCheckLayerAvailability
+                Resource: !Sub "arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/focuspath-api"
+      Tags:
+        - Key: Project
+          Value: FocusPath
 
   ApiAutoScaling:
     Type: AWS::AppRunner::AutoScalingConfiguration
@@ -101,6 +118,9 @@ Resources:
   ApiDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
+      Tags:
+        - Key: Project
+          Value: FocusPath
       DistributionConfig:
         Comment: Protected public entry point for the FocusPath API
         Enabled: true
