@@ -36,6 +36,8 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: node scripts/check-release.mjs "${RELEASE_TAG}"
+        env:
+          GITHUB_REF_NAME: ${{ env.RELEASE_TAG }}
       - run: npm test
       - run: npm run typecheck
       - run: npm run build
