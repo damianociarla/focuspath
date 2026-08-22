@@ -106,8 +106,8 @@ jobs:
         run: |
           version="${RELEASE_TAG#v}"
           expected_commit="$(git rev-parse HEAD)"
-          published_commit="$(npm view "focuspath@${version}" gitHead --json 2>/dev/null | tr -d '"' || true)"
-          if [[ -n "${published_commit}" ]]; then
+          if npm view "focuspath@${version}" version >/dev/null 2>&1; then
+            published_commit="$(npm view "focuspath@${version}" gitHead --json | tr -d '"')"
             if [[ "${published_commit}" != "${expected_commit}" ]]; then
               echo "focuspath@${version} exists for a different commit." >&2
               exit 1
