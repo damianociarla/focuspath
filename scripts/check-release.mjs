@@ -8,7 +8,7 @@ const publicPackage = JSON.parse(await readFile(new URL("../packages/focuspath/p
 const changelog = await readFile(new URL("../CHANGELOG.md", import.meta.url), "utf8");
 const openapi = await readFile(new URL("../docs/openapi.yml", import.meta.url), "utf8");
 const expectedVersion = publicPackage.version;
-const tag = process.env.GITHUB_REF_NAME ?? process.argv[2];
+const tag = process.argv[2] ?? process.env.GITHUB_REF_NAME;
 
 assert(tag, "Provide a release tag through GITHUB_REF_NAME or the first argument.");
 assert.equal(tag, `v${expectedVersion}`, `Tag ${tag} does not match package version ${expectedVersion}.`);
