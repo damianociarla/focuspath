@@ -17,8 +17,8 @@ assert.match(roleTemplate, /FocusPathApplicationRoleBoundary:/, "The application
 assert.match(roleTemplate, /focuspath-api-apprunner-ecr-access/, "IAM permissions must remain scoped to the FocusPath application role.");
 assert.match(
   roleTemplate,
-  /iam:PassedToService: build\.apprunner\.amazonaws\.com/,
-  "The application role may only be passed to the App Runner build service.",
+  /Action: iam:PassRole\n\s+Resource: !Sub "arn:\$\{AWS::Partition\}:iam::\$\{AWS::AccountId\}:role\/focuspath-api-apprunner-ecr-access"/,
+  "PassRole must remain scoped to the exact FocusPath application role.",
 );
 
 const deployIndex = releaseWorkflow.indexOf("  deploy-api:");
