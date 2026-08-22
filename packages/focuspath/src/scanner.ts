@@ -251,14 +251,35 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
       stoppedBecause = "tab-press-limit";
     }
 
-    await page.evaluate(async () => {
-      const root = document.documentElement;
-      const scrollBehavior = root.style.scrollBehavior;
-      root.style.scrollBehavior = "auto";
-      window.scrollTo(0, 0);
-      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-      root.style.scrollBehavior = scrollBehavior;
+    const captureStateIsStable = await page.evaluate(async () => {
+      const scrollingElement = document.scrollingElement;
+      const styledElements = [document.documentElement, document.body].filter((element): element is HTMLElement => element instanceof HTMLElement);
+      const previousStyles = styledElements.map((element) => ({
+        element,
+        value: element.style.getPropertyValue("scroll-behavior"),
+        priority: element.style.getPropertyPriority("scroll-behavior"),
+      }));
+      for (const { element } of previousStyles) element.style.setProperty("scroll-behavior", "auto", "important");
+
+      const active = document.activeElement;
+      if (active instanceof HTMLElement) active.blur();
+
+      let stableFrames = 0;
+      for (let frame = 0; frame < 60 && stableFrames < 2; frame += 1) {
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+        scrollingElement?.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        if (window.scrollX === 0 && window.scrollY === 0) stableFrames += 1;
+        else stableFrames = 0;
+      }
+
+      for (const { element, value, priority } of previousStyles) {
+        if (value) element.style.setProperty("scroll-behavior", value, priority);
+        else element.style.removeProperty("scroll-behavior");
+      }
+      return stableFrames >= 2;
     });
+    if (!captureStateIsStable) throw new Error("FocusPath could not stabilize the page at the final screenshot position.");
     const finalGeometry = await Promise.all(backendNodeIds.map((backendNodeId) => readNodeGeometry(cdp, backendNodeId)));
     const metadata = await page.evaluate(() => ({
         title: document.title,
@@ -285,7 +306,7 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
     });
 
     return {
-      version: 2,
+      version: 3,
       direction,
       url: page.url(),
       title: metadata.title,

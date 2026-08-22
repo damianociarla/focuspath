@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertPublicUrl, isPublicAddress, parseHttpUrl, resolvePublicTarget, UnsafeUrlError } from "../src/network-policy.js";
+import { assertPublicUrl, canonicalHostname, isPublicAddress, parseHttpUrl, resolvePublicTarget, UnsafeUrlError } from "../src/network-policy.js";
 
 describe("network policy", () => {
   it.each(["127.0.0.1", "10.0.0.1", "169.254.169.254", "192.168.1.2", "::1", "fc00::1"])("blocks private address %s", (address) => {
@@ -17,6 +17,11 @@ describe("network policy", () => {
   it("validates URL syntax without resolving DNS", () => {
     expect(parseHttpUrl("example.com").toString()).toBe("https://example.com/");
     expect(() => parseHttpUrl("ftp://example.com")).toThrow(UnsafeUrlError);
+  });
+
+  it("canonicalizes equivalent target hostnames for rate-limit keys", () => {
+    expect(canonicalHostname("Example.COM.")).toBe("example.com");
+    expect(canonicalHostname("[2606:4700:4700::1111]")).toBe("2606:4700:4700::1111");
   });
 
   it("returns the exact public addresses from one DNS resolution", async () => {

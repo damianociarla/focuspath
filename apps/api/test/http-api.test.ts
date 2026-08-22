@@ -19,7 +19,7 @@ describe("HTTP API", () => {
     const response = await fetch(`${baseUrl}/health`);
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(await response.json()).toEqual({ status: "ok", version: "0.4.4", activeScans: 0 });
+    expect(await response.json()).toEqual({ status: "ok", version: "0.5.0", activeScans: 0 });
   });
 
   it("enforces JSON content type", async () => {
@@ -42,7 +42,15 @@ describe("HTTP API", () => {
       body: JSON.stringify({ url: "https://example.com", extra: true }),
     });
     expect(extra.status).toBe(400);
-    expect(await extra.json()).toEqual({ error: "Request body must contain only a URL." });
+    expect(await extra.json()).toEqual({ error: "Request body must contain only a URL and optional response format." });
+
+    const invalidFormat = await fetch(`${baseUrl}/v1/scans`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com", format: "both" }),
+    });
+    expect(invalidFormat.status).toBe(400);
+    expect(await invalidFormat.json()).toEqual({ error: "Response format must be html or structured." });
   });
 
   it("rejects unsafe targets over the real HTTP boundary", async () => {
@@ -89,17 +97,23 @@ describe("HTTP API", () => {
 
   it("maps client quotas and scanner capacity to retryable responses", async () => {
     const rateLimited = await startApi({ RATE_LIMIT_PER_10_MINUTES: "0" });
+    const preflightLimited = await startApi({ PREFLIGHT_RATE_LIMIT_PER_MINUTE: "0" });
     const atCapacity = await startApi({ MAX_CONCURRENT_SCANS: "0" });
     try {
       const quota = await postScan(rateLimited.baseUrl, "https://example.com");
       expect(quota.status).toBe(429);
       expect(quota.headers.get("retry-after")).toBe("600");
 
+      const preflight = await postScan(preflightLimited.baseUrl, "https://does-not-resolve.invalid");
+      expect(preflight.status).toBe(429);
+      expect(preflight.headers.get("retry-after")).toBe("60");
+      expect(await preflight.json()).toEqual({ error: "Too many URL validation attempts. Try again in a minute." });
+
       const capacity = await postScan(atCapacity.baseUrl, "https://example.com");
       expect(capacity.status).toBe(503);
       expect(capacity.headers.get("retry-after")).toBe("15");
     } finally {
-      await Promise.all([stopApi(rateLimited.process), stopApi(atCapacity.process)]);
+      await Promise.all([stopApi(rateLimited.process), stopApi(preflightLimited.process), stopApi(atCapacity.process)]);
     }
   });
 

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: FocusPath Live Scanner API
-  version: 0.4.4
+  version: 0.5.0
   description: Rate-limited public demo API; not a general-purpose scanning service.
 paths:
   /health:
@@ -36,6 +36,11 @@ paths:
                   maxLength: 2048
                   description: Absolute HTTP(S) URL or hostname; omitted schemes default to HTTPS.
                   examples: ["https://example.com", "example.com"]
+                format:
+                  type: string
+                  enum: [html, structured]
+                  default: html
+                  description: Return portable reportHtml, or screenshot pixels for structured consumers.
       responses:
         "200":
           description: Scan completed
@@ -54,16 +59,31 @@ components:
     ScanResponse:
       type: object
       additionalProperties: false
-      required: [url, title, scannedAt, durationMs, engineVersion, direction, tabPressCount, limits, stoppedBecause, steps, issues, reportHtml]
+      required: [reportVersion, engineVersion, responseFormat, url, title, scannedAt, durationMs, direction, tabPressCount, limits, viewport, capture, stoppedBecause, steps, issues]
+      oneOf:
+        - properties:
+            responseFormat: { const: html }
+          required: [reportHtml]
+          not: { required: [screenshot] }
+        - properties:
+            responseFormat: { const: structured }
+          required: [screenshot]
+          not: { required: [reportHtml] }
       properties:
+        reportVersion: { type: integer, const: 3 }
+        engineVersion: { type: string }
+        responseFormat: { type: string, enum: [html, structured] }
         url: { type: string, format: uri }
         title: { type: string }
         scannedAt: { type: string, format: date-time }
         durationMs: { type: integer, minimum: 0 }
-        engineVersion: { type: string }
         direction: { type: string, enum: [forward, reverse] }
         tabPressCount: { type: integer, minimum: 0 }
         limits: { $ref: "#/components/schemas/TraversalLimits" }
+        viewport: { $ref: "#/components/schemas/Size" }
+        capture:
+          description: Pixel dimensions of the JPEG used by the visual evidence overlay.
+          $ref: "#/components/schemas/Size"
         stoppedBecause: { $ref: "#/components/schemas/StopReason" }
         steps:
           type: array
@@ -71,7 +91,20 @@ components:
         issues:
           type: array
           items: { $ref: "#/components/schemas/FocusIssue" }
-        reportHtml: { type: string }
+        reportHtml:
+          type: string
+          description: Self-contained portable report returned when format is html or omitted.
+        screenshot:
+          type: string
+          pattern: "^data:image/jpeg;base64,"
+          description: Screenshot data URL returned only when format is structured.
+    Size:
+      type: object
+      additionalProperties: false
+      required: [width, height]
+      properties:
+        width: { type: integer, minimum: 1 }
+        height: { type: integer, minimum: 1 }
     StopReason:
       type: string
       enum: [cycle-complete, step-limit, tab-press-limit, opaque-host-limit, no-focusable-elements, document-exhausted, stalled-on-element]

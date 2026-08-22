@@ -1,5 +1,6 @@
 export type IssueKind = "missing-name" | "missing-or-generic-role" | "positive-tabindex" | "focus-stalled" | "opaque-focus-host" | "opaque-host-limit";
 export type TraversalDirection = "forward" | "reverse";
+export type ReportSchemaVersion = 2 | 3;
 
 export interface TraversalLimits {
   maxSteps: number;
@@ -64,7 +65,8 @@ export interface FocusIssue {
 }
 
 export interface FocusReport {
-  version: 2;
+  /** scanFocusPath emits v3; v2 remains accepted by generateHtmlReport for saved-report compatibility. */
+  version: ReportSchemaVersion;
   direction: TraversalDirection;
   url: string;
   title: string;

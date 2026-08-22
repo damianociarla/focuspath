@@ -83,4 +83,6 @@ The API restricts URLs, pins browser connections to DNS-validated public IPs thr
 | `RATE_LIMIT_PER_10_MINUTES` | `4` | In-memory beta limit per client |
 | `GLOBAL_RATE_LIMIT_PER_HOUR` | `60` | Maximum accepted scans across the instance per hour |
 | `TARGET_RATE_LIMIT_PER_HOUR` | `2` | Maximum scans of the same hostname per hour |
+| `PREFLIGHT_RATE_LIMIT_PER_MINUTE` | `12` | URL/DNS validation attempts per client before scan admission |
+| `PREFLIGHT_GLOBAL_RATE_LIMIT_PER_MINUTE` | `120` | Global URL/DNS validation attempts before scan admission |
 | `ORIGIN_VERIFY_TOKEN` | empty locally | Private CloudFront-to-App Runner header value |

@@ -31,7 +31,7 @@
 
     <main id="documentation" tabindex="-1">
       <section class="docs-hero" aria-labelledby="docs-title">
-        <div><p class="eyebrow">Documentation / v0.4.4</p><h1 id="docs-title">Map the route.<br /><em>Keep the evidence.</em></h1></div>
+        <div><p class="eyebrow">Documentation / v0.5.0</p><h1 id="docs-title">Map the route.<br /><em>Keep the evidence.</em></h1></div>
         <div class="hero-note"><p>FocusPath follows Tab or Shift+Tab navigation in a real Chromium session, records observable focus stops, and produces a portable HTML report.</p><div><a class="action" href="#install">Install</a><a href="https://github.com/damianociarla/focuspath/blob/main/docs/openapi.yml">OpenAPI ↗</a></div></div>
       </section>
 
@@ -61,9 +61,9 @@ const report = await scanFocusPath("https://example.com", {
   timeoutMs: 30_000,
 });
 
-console.log(report.tabPressCount, report.limits);
+console.log(report.version, report.tabPressCount, report.limits);
 const html = generateHtmlReport(report);</code></pre>
-            <p class="callout"><strong>Contract:</strong> issue step numbers always reference a step present in <code>report.steps</code>. Tab presses are counted separately because not every press exposes an inspectable element.</p>
+            <p class="callout"><strong>Schema v3:</strong> <code>rect</code> is geometry in the final screenshot state; <code>observedRect</code> preserves traversal-time geometry. The reporter still accepts saved v2 reports. Issue step numbers always reference a step present in <code>report.steps</code>.</p>
           </section>
 
           <section id="traversal" aria-labelledby="traversal-title">
@@ -74,23 +74,27 @@ const html = generateHtmlReport(report);</code></pre>
             <p>FocusPath detects missing accessible names, generic roles, positive <code>tabindex</code>, cycles and stalled focus. Element identity comes from Chromium rather than the display selector, so similar deep DOM branches remain distinct.</p>
             <h3>Visual evidence</h3>
             <p>A final screenshot cannot truthfully represent every intermediate scroll position. FocusPath follows scrolling and clipping ancestors—including <code>overflow:hidden</code>, <code>overflow:clip</code>, same-origin iframe viewports and parent-page scrollers. A stop can expose multiple <code>scrollContexts</code> and a <code>visualEvidence</code> status: <code>plotted</code>, <code>partially-visible</code>, <code>outside-capture</code> or <code>sequence-only</code>.</p>
-            <p>Traversal-time geometry remains available as <code>observedRect</code>. Before the screenshot, FocusPath returns the page to its final capture state and asks Chromium for the border <code>quad</code> again. This keeps sticky controls and CSS-transformed iframe contents aligned with the image. Sequence-only steps remain in the ordered table but are omitted from the overlay. FocusPath is evidence for review—not a WCAG certification.</p>
+            <p>Traversal-time geometry remains available as <code>observedRect</code>. Before the screenshot, FocusPath removes focus, disables smooth scrolling and waits for a stable top-of-page capture state before asking Chromium for the border <code>quad</code> again. This keeps sticky controls and CSS-transformed iframe contents aligned with the image. Sequence-only steps remain in the ordered table but are omitted from the overlay. FocusPath is evidence for review—not a WCAG certification.</p>
           </section>
 
           <section id="http-api" aria-labelledby="http-title">
             <p class="section-number">04 / Automate</p><h2 id="http-title">HTTP API</h2>
-            <p>The hosted beta accepts a public HTTP(S) URL from the FocusPath website and currently scans forward. Responses expose the engine version, direction, elapsed time, Tab count, traversal limits, findings and generated report.</p>
+            <p>The hosted beta accepts a public HTTP(S) URL from the FocusPath website and currently scans forward with stricter limits than the local package. Every response includes report schema version, viewport, captured pixel dimensions, direction, elapsed time, Tab count, traversal limits and findings.</p>
             <pre><code>POST /v1/scans
 Content-Type: application/json
 
-{ "url": "https://example.com" }</code></pre>
+{ "url": "https://example.com" }
+
+// Machine-readable pixels instead of portable reportHtml:
+{ "url": "https://example.com", "format": "structured" }</code></pre>
+            <p>Omit <code>format</code> for a self-contained <code>reportHtml</code>. Use <code>structured</code> to receive the screenshot data URL directly without duplicating it inside HTML. FocusPath 0.5.0 emits report schema v3; see the changelog for migration details.</p>
             <p>The canonical machine-readable contract is the <a href="https://github.com/damianociarla/focuspath/blob/main/docs/openapi.yml">OpenAPI specification</a>. The public edge applies origin checks, request throttling, concurrency control, timeouts and response-size limits; those controls reduce abuse but do not make a browser API private.</p>
           </section>
 
           <section id="security" aria-labelledby="security-title">
             <p class="section-number">05 / Boundaries</p><h2 id="security-title">Security and privacy</h2>
             <p>Only scan pages you are authorized to test. The submitted URL is fetched in a temporary Chromium session on AWS. FocusPath does not intentionally persist page content, screenshots or generated reports after the response completes.</p>
-            <ul class="plain-list"><li>Infrastructure providers may retain request metadata in operational logs according to their configured retention.</li><li>Private, loopback, link-local and cloud-metadata destinations are rejected, including redirects and browser subrequests.</li><li>The hosted browser uses a local egress proxy that resolves each target once and connects directly to that validated public IP, preventing Chromium from performing a second DNS lookup.</li><li>Infrastructure-level egress filtering remains recommended defense in depth before operating a general-purpose service.</li><li>The optional AWS WAF layer is intentionally disabled in the low-cost deployment.</li></ul>
+            <ul class="plain-list"><li>Infrastructure providers may retain request metadata in operational logs according to their configured retention.</li><li>Private, loopback, link-local and cloud-metadata destinations are rejected, including redirects and browser subrequests.</li><li>DNS validation attempts are preflight-limited before resolution; equivalent hostnames share a canonical target bucket.</li><li>The hosted browser uses a local egress proxy that pins validated IPs, limits address attempts and cancels silent or abandoned upstream connections.</li><li>Infrastructure-level egress filtering remains recommended defense in depth before operating a general-purpose service.</li><li>The optional AWS WAF layer is intentionally disabled in the low-cost deployment.</li></ul>
             <p class="fine-print">FocusPath scans one selected direction at a time and does not compare both routes automatically. It cannot cover every browser, assistive technology, focus-indicator contrast or interaction state. Pair the report with manual keyboard and screen-reader testing.</p>
           </section>
         </article>

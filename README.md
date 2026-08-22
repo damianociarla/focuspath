@@ -112,7 +112,7 @@ Content-Type: application/json
 {"url":"https://example.com"}
 ```
 
-The response contains the engine version, traversal direction, total Tab count, effective traversal limits, focus stops, findings, and a self-contained `reportHtml` document. Focus geometry is re-measured in the final screenshot state, including sticky positioning and transformed iframe quads. Each stop classifies its visual evidence as plotted, partially visible, outside capture or sequence-only; scrolling and clipping contexts remain recorded separately. The hosted beta currently scans forward. `GET /health` reports API readiness and engine version. The beta API accepts only public HTTP(S) targets on ports 80 and 443, limits scan duration and request volume, and atomically rate-limits clients, global capacity and target hostnames. Hosted Chromium traffic passes through a local egress proxy that resolves once and opens the socket to the validated public IP, closing the application-level DNS-rebinding gap. Infrastructure egress filtering remains recommended defense in depth for a general-purpose service.
+The default response contains report schema version, engine version, viewport and capture dimensions, traversal metadata, focus stops, findings, and a self-contained `reportHtml` document. Send `{"url":"https://example.com","format":"structured"}` to receive screenshot pixels directly instead of embedded HTML. Schema v3 uses `rect` for final screenshot geometry and `observedRect` for traversal-time geometry. The hosted beta scans forward under a 25-second deadline and stricter quotas than the local package. DNS validation is preflight-limited, target keys are canonicalized, and Chromium traffic passes through a bounded local proxy that connects only to validated public IPs. Infrastructure egress filtering remains recommended defense in depth for a general-purpose service.
 
 FocusPath does not intentionally persist submitted page content or generated reports. AWS and GitHub may retain request metadata according to their operational logging policies; no application-level report store is configured for the beta.
 
@@ -123,7 +123,7 @@ The response contract and error statuses are documented in [OpenAPI 3.1](docs/op
 - [ ] GitHub Action with SARIF annotations
 - [ ] Compare focus paths between two builds
 - [ ] Detect focus restoration after dialogs close
-- [ ] Export JSON alongside the visual report
+- [x] Export structured JSON and screenshot evidence from the hosted API
 - [ ] Test Firefox and WebKit
 
 ## Contributing

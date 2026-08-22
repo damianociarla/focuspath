@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.0
+
+- Stabilize the final capture at scroll position zero, interrupting in-flight smooth focus scrolling before geometry and screenshot collection.
+- Bound pinned proxy connections, address attempts, response inactivity and total HTTP duration while cancelling upstream work when Chromium disconnects.
+- Protect DNS validation with separate client/global preflight quotas and canonical target-host keys.
+- Emit report schema v3: `rect` is final screenshot geometry and `observedRect` preserves traversal-time geometry; the HTML reporter continues to accept saved v2 reports.
+- Add `reportVersion`, viewport and capture dimensions to hosted responses, plus an opt-in structured format with the screenshot instead of duplicated HTML.
+- Clarify the hosted API beta limits, local package capabilities and visual-evidence guarantees across the site and documentation.
+
+### Migrating from report schema v2
+
+FocusPath `0.5.0` emits `version: 3`. In v3, `FocusStep.rect` always describes the final screenshot state; use `FocusStep.observedRect` for the position seen during keyboard traversal. Consumers that validate hosted responses must also accept the new response metadata. Request `{ "format": "structured" }` to receive screenshot pixels directly, or omit `format` to retain the portable `reportHtml` response.
+
 ## 0.4.4
 
 - Re-measure final focus geometry through Chromium border quads so sticky elements and transformed iframes align with the screenshot.
