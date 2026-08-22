@@ -57,15 +57,31 @@ jobs:
       id-token: write
     runs-on: ubuntu-latest
     steps:
+      - name: Check whether the API already matches the release
+        id: api-state
+        env:
+          API_URL: ${{ vars.VITE_API_URL }}
+        run: |
+          expected="${RELEASE_TAG#v}"
+          actual="$(curl --fail --silent --show-error "${API_URL}/health" | node -e "let body='';process.stdin.on('data',chunk=>body+=chunk).on('end',()=>console.log(JSON.parse(body).version))" || true)"
+          if [[ "${actual}" == "${expected}" ]]; then
+            echo "deploy=false" >> "${GITHUB_OUTPUT}"
+            echo "API already reports ${expected}; skipping AWS deployment."
+          else
+            echo "deploy=true" >> "${GITHUB_OUTPUT}"
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        if: steps.api-state.outputs.deploy == 'true'
         with:
           ref: ${{ env.RELEASE_TAG }}
       - uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        if: steps.api-state.outputs.deploy == 'true'
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: eu-west-1
           allowed-account-ids: ${{ vars.AWS_ACCOUNT_ID }}
       - name: Deploy or reuse immutable API image
+        if: steps.api-state.outputs.deploy == 'true'
         env:
           AWS_REGION: eu-west-1
           FOCUSPATH_IMAGE_TAG: ${{ env.RELEASE_TAG }}
