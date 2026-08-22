@@ -60,7 +60,7 @@ gh api --method PUT repos/damianociarla/focuspath/actions/oidc/customization/sub
 
 To roll back an OIDC customization, first deploy an AWS trust policy that accepts both the current and intended rollback subjects, verify assumption from a tag-bound job, and only then change the GitHub setting. Never change GitHub and AWS trust in the opposite order.
 
-The CloudFormation execution role can manage only the named FocusPath application role, FocusPath App Runner resources, the known CloudFront distribution and origin policy, and the FocusPath budget. The application role has a managed permission boundary that caps it to read-only access to the FocusPath ECR repository even if an inline policy is changed.
+The CloudFormation execution role can manage only the explicit `ApplicationRoleName`, FocusPath App Runner resources, the known CloudFront distribution and origin policy, and the FocusPath budget. The application role has a managed permission boundary that caps it to read-only access to the FocusPath ECR repository even if an inline policy is changed. The default preserves the physical role already owned by the production stack, avoiding an App Runner service replacement. If the application stack is recreated, read the new `AppRunnerEcrAccessRole` physical ID with `aws cloudformation describe-stack-resources` and redeploy the bootstrap stack with `ApplicationRoleName=<physical-id>` before the next application update.
 
 ## Release recovery
 

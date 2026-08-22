@@ -14,10 +14,10 @@ for (const wildcard of ["apprunner:*", "cloudfront:*", "budgets:*"]) {
   assert(!roleTemplate.includes(wildcard), `Infrastructure role must not grant ${wildcard}.`);
 }
 assert.match(roleTemplate, /FocusPathApplicationRoleBoundary:/, "The application role boundary must remain in the bootstrap stack.");
-assert.match(roleTemplate, /focuspath-api-apprunner-ecr-access/, "IAM permissions must remain scoped to the FocusPath application role.");
+assert.match(roleTemplate, /ApplicationRoleName:/, "The existing FocusPath application role must be explicit.");
 assert.match(
   roleTemplate,
-  /Action: iam:PassRole\n\s+Resource: !Sub "arn:\$\{AWS::Partition\}:iam::\$\{AWS::AccountId\}:role\/focuspath-api-apprunner-ecr-access"/,
+  /Action: iam:PassRole\n\s+Resource: !Sub "arn:\$\{AWS::Partition\}:iam::\$\{AWS::AccountId\}:role\/\$\{ApplicationRoleName\}"/,
   "PassRole must remain scoped to the exact FocusPath application role.",
 );
 

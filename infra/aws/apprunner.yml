@@ -34,7 +34,6 @@ Resources:
   AppRunnerEcrAccessRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: focuspath-api-apprunner-ecr-access
       PermissionsBoundary: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/focuspath-application-role-boundary"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"

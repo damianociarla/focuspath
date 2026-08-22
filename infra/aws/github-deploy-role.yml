@@ -24,6 +24,11 @@ Parameters:
     Type: String
     Default: 839342e7-4826-4313-9fb5-0d3b5295bbc5
     Description: Existing FocusPath origin request policy managed by the application stack
+  ApplicationRoleName:
+    Type: String
+    Default: focuspath-api-AppRunnerEcrAccessRole-NEgkxa66ln5j
+    AllowedPattern: "[A-Za-z0-9+=,.@_-]+"
+    Description: Existing App Runner ECR access role managed by the application stack
   ExistingGitHubOidcProviderArn:
     Type: String
     Default: ""
@@ -77,7 +82,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - iam:CreateRole
-                Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/focuspath-api-apprunner-ecr-access"
+                Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${ApplicationRoleName}"
                 Condition:
                   StringEquals:
                     iam:PermissionsBoundary: !Ref FocusPathApplicationRoleBoundary
@@ -88,6 +93,7 @@ Resources:
                   - iam:GetRolePolicy
                   - iam:ListRolePolicies
                   - iam:ListAttachedRolePolicies
+                  - iam:DetachRolePolicy
                   - iam:PutRolePolicy
                   - iam:DeleteRolePolicy
                   - iam:UpdateAssumeRolePolicy
@@ -95,10 +101,10 @@ Resources:
                   - iam:UntagRole
                   - iam:PutRolePermissionsBoundary
                   - iam:DeleteRolePermissionsBoundary
-                Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/focuspath-api-apprunner-ecr-access"
+                Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${ApplicationRoleName}"
               - Effect: Allow
                 Action: iam:PassRole
-                Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/focuspath-api-apprunner-ecr-access"
+                Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${ApplicationRoleName}"
               - Effect: Allow
                 Action: iam:CreateServiceLinkedRole
                 Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/aws-service-role/apprunner.amazonaws.com/AWSServiceRoleForAppRunner"
