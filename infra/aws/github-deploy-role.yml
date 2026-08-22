@@ -8,6 +8,14 @@ Parameters:
   GitHubRepository:
     Type: String
     Default: focuspath
+  GitHubOwnerId:
+    Type: String
+    Default: "2201712"
+    Description: Immutable GitHub account ID used in OIDC subject claims
+  GitHubRepositoryId:
+    Type: String
+    Default: "1341119918"
+    Description: Immutable GitHub repository ID used in OIDC subject claims
   ExistingGitHubOidcProviderArn:
     Type: String
     Default: ""
@@ -74,7 +82,7 @@ Resources:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
-                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubOwner}/${GitHubRepository}:ref:refs/tags/v*"
+                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubOwner}@${GitHubOwnerId}/${GitHubRepository}@${GitHubRepositoryId}:ref:refs/tags/v*"
       Policies:
         - PolicyName: FocusPathReleaseDeploy
           PolicyDocument:
