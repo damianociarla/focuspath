@@ -37,6 +37,11 @@ assert.match(releaseWorkflow, /publish-npm:\n\s+needs: deploy-api/, "npm publica
 assert.match(releaseWorkflow, /workflow_dispatch:/, "Release recovery must remain manually invokable.");
 assert.match(
   releaseWorkflow,
+  /id: api-state[\s\S]*?API already reports[\s\S]*?if: steps\.api-state\.outputs\.deploy == 'true'/,
+  "Release recovery must skip AWS credentials when the tagged API is already healthy.",
+);
+assert.match(
+  releaseWorkflow,
   /if npm view "focuspath@\$\{version\}" version >\/dev\/null 2>&1; then/,
   "npm recovery must distinguish a missing version from registry JSON error output.",
 );
