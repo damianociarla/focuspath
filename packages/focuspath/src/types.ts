@@ -1,6 +1,6 @@
 export type IssueKind = "missing-name" | "missing-or-generic-role" | "positive-tabindex" | "focus-stalled" | "opaque-focus-host" | "opaque-host-limit";
 export type TraversalDirection = "forward" | "reverse";
-export type ReportSchemaVersion = 2 | 3;
+export type ReportSchemaVersion = 2 | 3 | 4;
 
 export interface TraversalLimits {
   maxSteps: number;
@@ -65,7 +65,7 @@ export interface FocusIssue {
 }
 
 export interface FocusReport {
-  /** scanFocusPath emits v3; v2 remains accepted by generateHtmlReport for saved-report compatibility. */
+  /** scanFocusPath emits v4; v2 and v3 remain accepted by generateHtmlReport for saved-report compatibility. */
   version: ReportSchemaVersion;
   direction: TraversalDirection;
   url: string;
@@ -76,6 +76,12 @@ export interface FocusReport {
   limits: TraversalLimits;
   viewport: { width: number; height: number };
   document: { width: number; height: number };
+  /** Source document dimensions and whether the screenshot budget truncated the captured pixels. */
+  capture?: {
+    sourceWidth: number;
+    sourceHeight: number;
+    truncated: boolean;
+  };
   network?: {
     requestCount: number;
     blockedRequestCount: number;
@@ -101,11 +107,11 @@ export interface ScanOptions {
   /** Delay after each Tab press before reading focus. Defaults to 75ms. */
   focusSettleMs?: number;
   headless?: boolean;
-  /** Maximum number of network requests made by the page. */
+  /** Maximum number of network requests made by the page. Defaults to 500; use Infinity explicitly to opt out. */
   maxRequests?: number;
   /** Browser resource types to block before they are downloaded. */
   blockedResourceTypes?: string[];
-  /** Maximum document height captured in the embedded screenshot. */
+  /** Maximum document height captured in the embedded screenshot. Defaults to 20,000px; use Infinity explicitly to opt out. */
   maxScreenshotHeight?: number;
   /** Return false to block a main-frame or subresource URL before the browser requests it. */
   isUrlAllowed?: (url: string) => boolean | Promise<boolean>;

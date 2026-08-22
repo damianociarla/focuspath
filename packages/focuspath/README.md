@@ -17,6 +17,9 @@ focuspath <url> [options]
 --max-steps <number>         Maximum observed focus stops (default: 50)
 --max-tab-presses <number>   Maximum total Tab presses (default: 4 × max-steps)
 --max-opaque-tab-presses <number> Repeated Tab limit per opaque host (default: 100)
+--max-requests <number>      Maximum page requests (default: 500; max: 10000)
+--max-screenshot-height <px> Screenshot height budget (default: 20000; max: 100000)
+--unlimited                  Explicitly remove request and screenshot-height limits
 --direction <forward|reverse> Keyboard traversal direction (default: forward)
 --viewport <width>x<height>  Browser viewport (default: 1440x900)
 --headed                     Show Chromium while scanning
@@ -37,6 +40,8 @@ const report = await scanFocusPath("https://example.com", {
   maxSteps: 60,
   maxTabPresses: 240,
   maxOpaqueTabPresses: 120,
+  maxRequests: 500,
+  maxScreenshotHeight: 20_000,
   direction: "reverse",
   focusSettleMs: 100,
   viewport: { width: 1440, height: 900 },
@@ -45,7 +50,7 @@ const report = await scanFocusPath("https://example.com", {
 const html = generateHtmlReport(report);
 ```
 
-The scanner currently targets Chromium and supports forward `Tab` or reverse `Shift+Tab` traversal. `maxSteps` limits observable report entries; `maxTabPresses` counts every Tab key press, including movement inside opaque hosts. Cross-origin frames and closed shadow roots inferred from repeated, uncanceled Tab movement use the independent `maxOpaqueTabPresses` budget. Canceled Tab events that leave focus in place are reported as stalled focus. Chromium DOM identity, not the display selector, drives stall and cycle detection. Stops affected by independently scrolling or clipping ancestors remain in the sequence with `scrollContexts`, including hidden/clip containers, same-origin iframe viewports and parent-page scrollers; decorative overflow does not hide a fully visible control from the overlay. Schema v3 reports use `observedRect` for traversal-time geometry; `rect` and the optional transformed `quad` are measured only after FocusPath interrupts smooth scrolling and stabilizes the final screenshot state. Chromium captures beyond the first viewport up to `maxScreenshotHeight`. `visualEvidence.status` distinguishes plotted, partially visible, outside-capture and sequence-only stops. `network` records request totals and configured resource blocking so geometry restrictions remain explicit. The HTML reporter continues to accept saved schema v2 reports. The deprecated `scrollContext` field mirrors the first entry for v0.4.1 compatibility. Computed outline and shadow values are recorded for manual review; FocusPath does not claim to automatically verify WCAG focus appearance.
+The scanner currently targets Chromium and supports forward `Tab` or reverse `Shift+Tab` traversal. `maxSteps` limits observable report entries; `maxTabPresses` counts every Tab key press, including movement inside opaque hosts. Cross-origin frames and closed shadow roots inferred from repeated, uncanceled Tab movement use the independent `maxOpaqueTabPresses` budget. Canceled Tab events that leave focus in place are reported as stalled focus. Chromium DOM identity, not the display selector, drives stall and cycle detection. Stops affected by independently scrolling or clipping ancestors remain in the sequence with `scrollContexts`, including hidden/clip containers, same-origin iframe viewports and parent-page scrollers; decorative overflow does not hide a fully visible control from the overlay. Schema v4 reports use `observedRect` for traversal-time geometry; `rect` and the optional transformed `quad` are measured only after FocusPath interrupts smooth scrolling and stabilizes the final screenshot state. Chromium captures beyond the first viewport up to the default 20,000px `maxScreenshotHeight`; `capture.truncated` makes a clipped capture explicit. Local scans allow 500 requests by default. `visualEvidence.status` distinguishes plotted, partially visible, outside-capture and sequence-only stops. `network` records request totals and configured resource blocking so geometry restrictions remain explicit. The HTML reporter continues to accept saved schema v2 and v3 reports. The deprecated `scrollContext` field mirrors the first entry for v0.4.1 compatibility. Computed outline and shadow values are recorded for manual review; FocusPath does not claim to automatically verify WCAG focus appearance.
 
 Repository, documentation, and issue tracker: [github.com/damianociarla/focuspath](https://github.com/damianociarla/focuspath)
 

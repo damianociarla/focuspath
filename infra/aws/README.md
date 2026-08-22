@@ -22,7 +22,7 @@ AWS_PROFILE=portfolio-bootstrap AWS_REGION=eu-west-1 ./infra/aws/deploy-app-runn
 
 ## Release automation
 
-Tagged releases use GitHub OIDC—without long-lived AWS keys—to deploy the immutable API image, require `/health` to report the tag version, and only then publish GitHub Pages and the GitHub Release. Bootstrap the roles once:
+Tagged releases use GitHub OIDC—without long-lived AWS keys—to validate the release, deploy and health-check the reversible API, publish npm, and only then publish GitHub Pages and the GitHub Release. Bootstrap the roles once:
 
 ```bash
 aws cloudformation deploy --profile portfolio-bootstrap --region eu-west-1 \
@@ -44,10 +44,38 @@ aws cloudformation deploy --profile portfolio-bootstrap --region eu-west-1 \
 
 Configure repository variables `AWS_DEPLOY_ROLE_ARN`, `AWS_CLOUDFORMATION_ROLE_ARN`, `AWS_ACCOUNT_ID`, and the repository secret `FOCUSPATH_ORIGIN_VERIFY_TOKEN` from the stack outputs and the existing ignored origin-token file. The trust policy accepts only version tags from `damianociarla/focuspath` and uses GitHub's immutable owner and repository IDs. Override `GitHubOwnerId` and `GitHubRepositoryId` when reusing this template for another repository.
 
+Verify the repository OIDC subject configuration before changing the AWS trust policy:
+
+```bash
+gh api repos/damianociarla/focuspath/actions/oidc/customization/sub
+```
+
+Repositories created after GitHub's immutable-subject rollout already emit the ID-based prefix. Make that intent explicit without changing the current subject format:
+
+```bash
+gh api --method PUT repos/damianociarla/focuspath/actions/oidc/customization/sub \
+  -F use_default=true \
+  -F use_immutable_subject=true
+```
+
+To roll back an OIDC customization, first deploy an AWS trust policy that accepts both the current and intended rollback subjects, verify assumption from a tag-bound job, and only then change the GitHub setting. Never change GitHub and AWS trust in the opposite order.
+
+The CloudFormation execution role can manage only the explicit `ApplicationRoleName`, FocusPath App Runner resources, the known CloudFront distribution and origin policy, and the FocusPath budget. The application role has a managed permission boundary that caps its effective permissions to read-only access to the FocusPath ECR repository, including when CloudFormation attaches or restores the App Runner service policy. The default preserves the physical role already owned by the production stack, avoiding an App Runner service replacement. If the application stack is recreated, read the new `AppRunnerEcrAccessRole` physical ID with `aws cloudformation describe-stack-resources` and redeploy the bootstrap stack with `ApplicationRoleName=<physical-id>` before the next application update.
+
+## Release recovery
+
+Every release step is idempotent: an existing immutable ECR tag is reused, an npm version is accepted only when its `gitHead` matches the release commit, Pages may be redeployed, and an existing GitHub Release is retained. Retry a failed release from its existing tag:
+
+```bash
+gh workflow run release.yml --repo damianociarla/focuspath --ref main -f tag=v0.6.0
+```
+
+The AWS deploy job intentionally keeps the tag-based OIDC subject instead of attaching a GitHub environment, because the default environment subject would replace the tag ref in `sub`. Protected `v*` tags and `main` gate who can reach the tag-bound AWS trust.
+
 The script:
 
 1. Creates an immutable, scan-on-push ECR repository if needed.
-2. Builds the image for `linux/amd64` and pushes it to ECR.
+2. Reuses an existing immutable release image or builds it for `linux/amd64` and pushes it to ECR.
 3. Reuses a private origin token from the ignored `infra/aws/.origin-verify-token` file (mode `600`). Back this file up securely if infrastructure deployments run from another machine.
 4. Optionally deploys the global WAF stack in `us-east-1` when `FOCUSPATH_ENABLE_WAF=true`.
 5. Deploys App Runner, its one-instance scaling cap and CloudFront with CloudFormation.

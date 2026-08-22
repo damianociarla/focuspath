@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.6.0
+
+- Bound local scans to 500 requests and 20,000 screenshot pixels by default, expose both CLI limits, and require an explicit `--unlimited` opt-out.
+- Emit report schema v4 capture metadata and explain when screenshot evidence is truncated while retaining every focus stop in the sequence.
+- Admit hosted scans atomically across capacity and quotas so a `503` never consumes client, global or target allowance.
+- Make `/v1` responses evolutionary, publish an explicit compatibility policy and keep request bodies strict.
+- Deploy and health-check the reversible AWS service before npm publication; make ECR, npm and GitHub Release recovery idempotent.
+- Scope GitHub Actions permissions per job, pin third-party actions to commit SHAs and support release recovery from an existing tag.
+- Replace the broad CloudFormation role with enumerated service actions, FocusPath resource scopes and a permission boundary for application roles.
+
+### Migrating from report schema v3
+
+FocusPath `0.6.0` emits `version: 4`. `FocusReport.capture` records the source document size and whether `maxScreenshotHeight` truncated the captured pixels. The existing `document` field remains the exact JPEG dimensions, and the HTML reporter continues to accept saved v2 and v3 reports.
+
 ## 0.5.1
 
 - Capture up to the configured 5,000px document budget through Chromium's beyond-viewport screenshot API.
