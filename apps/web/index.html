@@ -44,7 +44,7 @@
         "description": "An open-source visual accessibility scanner that maps keyboard focus order and creates portable HTML reports.",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Any operating system with a modern web browser",
-        "softwareVersion": "0.5.0",
+        "softwareVersion": "0.5.1",
         "license": "https://opensource.org/license/mit",
         "codeRepository": "https://github.com/damianociarla/focuspath",
         "author": {
@@ -114,7 +114,7 @@
             <details class="scan-notes">
               <summary>Privacy and scan limitations</summary>
               <p>The URL is sent to the FocusPath API on AWS and its page is fetched by Chromium. FocusPath does not intentionally persist page content or reports; infrastructure providers may retain request metadata in operational logs.</p>
-              <p>The hosted beta has a 25-second deadline, one active scanner, request quotas, at most 50 observed stops and 200 Tab presses. The CLI and library run locally with configurable limits and can scan Shift+Tab separately.</p>
+              <p>The hosted beta has a 25-second deadline, one active scanner, request quotas, at most 50 observed stops, 200 Tab presses and 5,000px of beyond-viewport screenshot evidence. Font and media requests are blocked to bound cost; the report names these restrictions because fallback fonts can change geometry. The CLI and library run locally with configurable limits and can scan Shift+Tab separately.</p>
               <p>Cross-origin iframes are opaque; closed shadow roots can only be inferred from repeated focus. FocusPath cannot inspect their internal controls. It does not certify WCAG conformance, compare both directions automatically, or fully cover platform differences and focus-indicator contrast. <a href="./docs.html#security">Read the evidence contract, schema and privacy notes.</a></p>
             </details>
           </form>
@@ -135,7 +135,7 @@
               <p data-scan-error-copy></p>
             </div>
             <div class="scan-result" data-scan-result role="region" aria-labelledby="result-title" hidden>
-              <div class="result-title"><span data-result-status>Complete</span><h3 id="result-title" data-result-title tabindex="-1"></h3><p data-result-url></p></div>
+              <div class="result-title"><span data-result-status>Complete</span><span data-result-engine></span><h3 id="result-title" data-result-title tabindex="-1"></h3><p data-result-url></p></div>
               <div class="result-metrics"><div><strong data-result-stops>0</strong><span>Stops</span></div><div><strong data-result-tabs>0</strong><span>Tab presses</span></div><div><strong data-result-errors>0</strong><span>Errors</span></div><div><strong data-result-warnings>0</strong><span>Warnings</span></div></div>
               <ul class="result-issues" data-result-issues></ul>
               <div class="result-actions"><a data-open-report href="#scan" target="_blank" rel="noopener">Open report ↗</a><a data-download-report href="#scan" download="focuspath-report.html">Download HTML ↓</a></div>

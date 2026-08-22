@@ -163,6 +163,7 @@ function showScanResult(result: ScanResponse): void {
   setText("[data-result-status]", errors > 0 ? "Action needed" : "Scan complete");
   setText("[data-result-title]", result.title || "Untitled page");
   setText("[data-result-url]", result.url);
+  setText("[data-result-engine]", `Engine ${result.engineVersion}`);
   setText("[data-result-stops]", String(result.steps.length));
   setText("[data-result-tabs]", String(result.tabPressCount));
   setText("[data-result-errors]", String(errors));

@@ -19,7 +19,7 @@ describe("HTTP API", () => {
     const response = await fetch(`${baseUrl}/health`);
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(await response.json()).toEqual({ status: "ok", version: "0.5.0", activeScans: 0 });
+    expect(await response.json()).toEqual({ status: "ok", version: "0.5.1", activeScans: 0 });
   });
 
   it("enforces JSON content type", async () => {
@@ -35,6 +35,14 @@ describe("HTTP API", () => {
       body: "{",
     });
     expect(malformed.status).toBe(400);
+
+    const nullBody = await fetch(`${baseUrl}/v1/scans`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "null",
+    });
+    expect(nullBody.status).toBe(400);
+    expect(await nullBody.json()).toEqual({ error: "Request body must be a JSON object." });
 
     const extra = await fetch(`${baseUrl}/v1/scans`, {
       method: "POST",
@@ -114,6 +122,27 @@ describe("HTTP API", () => {
       expect(capacity.headers.get("retry-after")).toBe("15");
     } finally {
       await Promise.all([stopApi(rateLimited.process), stopApi(preflightLimited.process), stopApi(atCapacity.process)]);
+    }
+  });
+
+  it("never admits two concurrent scans when capacity is one", async () => {
+    const isolated = await startApi({
+      MAX_CONCURRENT_SCANS: "1",
+      RATE_LIMIT_PER_10_MINUTES: "10",
+      TARGET_RATE_LIMIT_PER_HOUR: "10",
+    });
+    try {
+      const responses = await Promise.all([
+        postScan(isolated.baseUrl, "https://example.com/?capacity=one"),
+        postScan(isolated.baseUrl, "https://example.com/?capacity=two"),
+      ]);
+      const statuses = responses.map((response) => response.status);
+      expect(statuses.filter((status) => status === 503)).toHaveLength(1);
+      expect(statuses.filter((status) => status !== 503)).toHaveLength(1);
+      const health = await fetch(`${isolated.baseUrl}/health`).then((response) => response.json()) as { activeScans: number };
+      expect(health.activeScans).toBe(0);
+    } finally {
+      await stopApi(isolated.process);
     }
   });
 

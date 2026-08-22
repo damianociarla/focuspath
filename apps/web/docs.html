@@ -31,7 +31,7 @@
 
     <main id="documentation" tabindex="-1">
       <section class="docs-hero" aria-labelledby="docs-title">
-        <div><p class="eyebrow">Documentation / v0.5.0</p><h1 id="docs-title">Map the route.<br /><em>Keep the evidence.</em></h1></div>
+        <div><p class="eyebrow">Documentation / v0.5.1</p><h1 id="docs-title">Map the route.<br /><em>Keep the evidence.</em></h1></div>
         <div class="hero-note"><p>FocusPath follows Tab or Shift+Tab navigation in a real Chromium session, records observable focus stops, and produces a portable HTML report.</p><div><a class="action" href="#install">Install</a><a href="https://github.com/damianociarla/focuspath/blob/main/docs/openapi.yml">OpenAPI ↗</a></div></div>
       </section>
 
@@ -87,7 +87,8 @@ Content-Type: application/json
 
 // Machine-readable pixels instead of portable reportHtml:
 { "url": "https://example.com", "format": "structured" }</code></pre>
-            <p>Omit <code>format</code> for a self-contained <code>reportHtml</code>. Use <code>structured</code> to receive the screenshot data URL directly without duplicating it inside HTML. FocusPath 0.5.0 emits report schema v3; see the changelog for migration details.</p>
+            <p>Omit <code>format</code> for a self-contained <code>reportHtml</code>. Use <code>structured</code> to receive the screenshot data URL directly without duplicating it inside HTML. FocusPath 0.5.1 emits report schema v3 and captures beyond the first viewport up to the configured height budget.</p>
+            <p>The hosted beta blocks font and media requests to bound cost. Every response reports its network restrictions and blocked-request count because fallback fonts can change wrapping and geometry.</p>
             <p>The canonical machine-readable contract is the <a href="https://github.com/damianociarla/focuspath/blob/main/docs/openapi.yml">OpenAPI specification</a>. The public edge applies origin checks, request throttling, concurrency control, timeouts and response-size limits; those controls reduce abuse but do not make a browser API private.</p>
           </section>
 

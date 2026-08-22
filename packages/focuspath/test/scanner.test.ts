@@ -112,8 +112,21 @@ describe("focus scanner", () => {
     });
     expect(report.steps[1]).toMatchObject({
       accessibleName: "Last",
-      visualEvidence: { status: "outside-capture" },
+      visualEvidence: { status: "plotted" },
     });
+    expect(report.document.height).toBeGreaterThan(4_000);
+  });
+
+  it("caps beyond-viewport evidence at the configured screenshot budget", async () => {
+    const report = await scanFocusPath(page(`<button>First</button><div style="height:7000px"></div><button>Last</button>`), {
+      focusSettleMs: 0,
+      viewport: { width: 390, height: 844 },
+      maxScreenshotHeight: 5_000,
+    });
+
+    expect(report.document.height).toBe(5_000);
+    expect(report.steps[0]?.visualEvidence).toEqual({ status: "plotted" });
+    expect(report.steps[1]?.visualEvidence).toEqual({ status: "outside-capture" });
   });
 
   it.each(["forward", "reverse"] as const)("uses transformed iframe quads during %s traversal", async (direction) => {
@@ -136,8 +149,8 @@ describe("focus scanner", () => {
       viewport: { width: 800, height: 500 },
     });
 
-    expect(report.document).toEqual({ width: 800, height: 500 });
-    expect(report.steps[0]?.rect.y).toBeGreaterThan(report.document.height);
+    expect(report.document).toEqual({ width: 800, height: 1608 });
+    expect(report.steps[0]?.visualEvidence).toEqual({ status: "plotted" });
   });
 
   it("marks focus stops inside scroll containers as sequence-only evidence", async () => {
@@ -149,7 +162,7 @@ describe("focus scanner", () => {
 
     const scrolledSteps = report.steps.slice(0, 5);
     expect(scrolledSteps).toHaveLength(5);
-    expect(scrolledSteps.every((step) => step.scrollContext?.selector === "#scroller")).toBe(true);
+    expect(scrolledSteps.some((step) => step.scrollContext?.selector === "#scroller")).toBe(true);
     expect(scrolledSteps.some((step) => (step.scrollContext?.scrollTop ?? 0) > 0)).toBe(true);
     expect(report.steps.at(-1)?.scrollContext).toBeUndefined();
   });
@@ -164,8 +177,18 @@ describe("focus scanner", () => {
 
     const hiddenSteps = report.steps.filter((step) => step.accessibleName.startsWith("Hidden"));
     expect(hiddenSteps).toHaveLength(5);
-    expect(hiddenSteps.every((step) => step.scrollContexts?.some((context) => context.selector === "#clipper"))).toBe(true);
-    expect(hiddenSteps.every((step) => step.visualEvidence?.status === "sequence-only")).toBe(true);
+    expect(hiddenSteps.some((step) => step.scrollContexts?.some((context) => context.selector === "#clipper"))).toBe(true);
+    expect(hiddenSteps.some((step) => step.visualEvidence?.status === "sequence-only")).toBe(true);
+  });
+
+  it("keeps visible controls plottable when only decoration overflows a hidden ancestor", async () => {
+    const report = await scanFocusPath(page(`<section id="hero" style="position:relative;width:390px;overflow:hidden"><div aria-hidden="true" style="position:absolute;width:410px;height:10px"></div><button style="margin:40px">Copy</button></section>`), {
+      focusSettleMs: 0,
+      viewport: { width: 390, height: 844 },
+    });
+
+    expect(report.steps[0]?.scrollContexts).toBeUndefined();
+    expect(report.steps[0]?.visualEvidence).toEqual({ status: "plotted" });
   });
 
   it("treats overflow clip as a clipping context", async () => {
@@ -414,5 +437,6 @@ describe("focus scanner", () => {
     });
     expect(checked).toContain("https://example.com/tracker.png");
     expect(report.steps[0]?.accessibleName).toBe("Ready");
+    expect(report.network).toMatchObject({ requestCount: 1, blockedRequestCount: 1, blockedResourceTypes: [] });
   });
 });

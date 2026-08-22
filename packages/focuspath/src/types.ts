@@ -76,6 +76,11 @@ export interface FocusReport {
   limits: TraversalLimits;
   viewport: { width: number; height: number };
   document: { width: number; height: number };
+  network?: {
+    requestCount: number;
+    blockedRequestCount: number;
+    blockedResourceTypes: string[];
+  };
   steps: FocusStep[];
   issues: FocusIssue[];
   screenshot: string;
