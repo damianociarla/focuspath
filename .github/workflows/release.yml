@@ -50,7 +50,6 @@ jobs:
           allowed-account-ids: ${{ vars.AWS_ACCOUNT_ID }}
       - name: Deploy immutable API image
         env:
-          AWS_PROFILE: ""
           AWS_REGION: eu-west-1
           FOCUSPATH_IMAGE_TAG: ${{ github.ref_name }}
           FOCUSPATH_ORIGIN_VERIFY_TOKEN: ${{ secrets.FOCUSPATH_ORIGIN_VERIFY_TOKEN }}
