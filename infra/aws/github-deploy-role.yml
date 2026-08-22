@@ -8,10 +8,18 @@ Parameters:
   GitHubRepository:
     Type: String
     Default: focuspath
+  ExistingGitHubOidcProviderArn:
+    Type: String
+    Default: ""
+    Description: Reuse an account-level GitHub Actions OIDC provider when one already exists
+
+Conditions:
+  CreateGitHubOidcProvider: !Equals [!Ref ExistingGitHubOidcProviderArn, ""]
 
 Resources:
   GitHubOidcProvider:
     Type: AWS::IAM::OIDCProvider
+    Condition: CreateGitHubOidcProvider
     Properties:
       Url: https://token.actions.githubusercontent.com
       ClientIdList: [sts.amazonaws.com]
@@ -56,7 +64,11 @@ Resources:
         Version: "2012-10-17"
         Statement:
           - Effect: Allow
-            Principal: { Federated: !Ref GitHubOidcProvider }
+            Principal:
+              Federated: !If
+                - CreateGitHubOidcProvider
+                - !Ref GitHubOidcProvider
+                - !Ref ExistingGitHubOidcProviderArn
             Action: sts:AssumeRoleWithWebIdentity
             Condition:
               StringEquals:
