@@ -31,6 +31,17 @@ aws cloudformation deploy --profile portfolio-bootstrap --region eu-west-1 \
   --capabilities CAPABILITY_NAMED_IAM
 ```
 
+If the account already has the account-level GitHub Actions OIDC provider, reuse it:
+
+```bash
+aws cloudformation deploy --profile portfolio-bootstrap --region eu-west-1 \
+  --stack-name focuspath-github-deploy \
+  --template-file infra/aws/github-deploy-role.yml \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides \
+    ExistingGitHubOidcProviderArn=arn:aws:iam::<account-id>:oidc-provider/token.actions.githubusercontent.com
+```
+
 Configure repository variables `AWS_DEPLOY_ROLE_ARN`, `AWS_CLOUDFORMATION_ROLE_ARN`, `AWS_ACCOUNT_ID`, and the repository secret `FOCUSPATH_ORIGIN_VERIFY_TOKEN` from the stack outputs and the existing ignored origin-token file. The trust policy accepts only version tags from `damianociarla/focuspath`.
 
 The script:
