@@ -15,6 +15,11 @@ for (const wildcard of ["apprunner:*", "cloudfront:*", "budgets:*"]) {
 }
 assert.match(roleTemplate, /FocusPathApplicationRoleBoundary:/, "The application role boundary must remain in the bootstrap stack.");
 assert.match(roleTemplate, /focuspath-api-apprunner-ecr-access/, "IAM permissions must remain scoped to the FocusPath application role.");
+assert.match(
+  roleTemplate,
+  /iam:PassedToService: build\.apprunner\.amazonaws\.com/,
+  "The application role may only be passed to the App Runner build service.",
+);
 
 const deployIndex = releaseWorkflow.indexOf("  deploy-api:");
 const publishIndex = releaseWorkflow.indexOf("  publish-npm:");

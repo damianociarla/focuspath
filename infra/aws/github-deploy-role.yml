@@ -101,7 +101,7 @@ Resources:
                 Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/focuspath-api-apprunner-ecr-access"
                 Condition:
                   StringEquals:
-                    iam:PassedToService: apprunner.amazonaws.com
+                    iam:PassedToService: build.apprunner.amazonaws.com
               - Effect: Allow
                 Action: iam:CreateServiceLinkedRole
                 Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/aws-service-role/apprunner.amazonaws.com/AWSServiceRoleForAppRunner"
