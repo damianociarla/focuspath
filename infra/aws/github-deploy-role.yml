@@ -93,6 +93,7 @@ Resources:
                   - iam:GetRolePolicy
                   - iam:ListRolePolicies
                   - iam:ListAttachedRolePolicies
+                  - iam:AttachRolePolicy
                   - iam:DetachRolePolicy
                   - iam:PutRolePolicy
                   - iam:DeleteRolePolicy

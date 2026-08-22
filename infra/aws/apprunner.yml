@@ -42,21 +42,8 @@ Resources:
             Principal:
               Service: build.apprunner.amazonaws.com
             Action: sts:AssumeRole
-      Policies:
-        - PolicyName: FocusPathEcrRead
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action: ecr:GetAuthorizationToken
-                Resource: "*"
-              - Effect: Allow
-                Action:
-                  - ecr:GetDownloadUrlForLayer
-                  - ecr:BatchGetImage
-                  - ecr:DescribeImages
-                  - ecr:BatchCheckLayerAvailability
-                Resource: !Sub "arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/focuspath-api"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess
       Tags:
         - Key: Project
           Value: FocusPath
