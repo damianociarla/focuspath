@@ -37,8 +37,8 @@ assert.match(releaseWorkflow, /publish-npm:\n\s+needs: deploy-api/, "npm publica
 assert.match(releaseWorkflow, /workflow_dispatch:/, "Release recovery must remain manually invokable.");
 assert.match(
   releaseWorkflow,
-  /node scripts\/check-release\.mjs "\$\{RELEASE_TAG\}"\n\s+env:\n\s+GITHUB_REF_NAME: \$\{\{ env\.RELEASE_TAG \}\}/,
-  "Recovery validation must override the trigger ref after checking out an existing tag.",
+  /env -u GITHUB_REF_NAME node scripts\/check-release\.mjs "\$\{RELEASE_TAG\}"/,
+  "Recovery validation must remove the trigger ref after checking out an existing tag.",
 );
 assert.match(
   releaseWorkflow,
