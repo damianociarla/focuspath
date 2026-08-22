@@ -35,6 +35,11 @@ const publishIndex = releaseWorkflow.indexOf("  publish-npm:");
 assert(deployIndex >= 0 && publishIndex > deployIndex, "AWS deployment must precede npm publication.");
 assert.match(releaseWorkflow, /publish-npm:\n\s+needs: deploy-api/, "npm publication must require a healthy API deployment.");
 assert.match(releaseWorkflow, /workflow_dispatch:/, "Release recovery must remain manually invokable.");
+assert.match(
+  releaseWorkflow,
+  /if npm view "focuspath@\$\{version\}" version >\/dev\/null 2>&1; then/,
+  "npm recovery must distinguish a missing version from registry JSON error output.",
+);
 
 for (const [path, workflow] of workflowFiles) {
   for (const match of workflow.matchAll(/^\s*-?\s*uses:\s*([^\s#]+)/gm)) {
