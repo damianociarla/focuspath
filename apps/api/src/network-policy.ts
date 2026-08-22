@@ -50,7 +50,7 @@ export async function resolvePublicTarget(
   if (url.username || url.password) throw new UnsafeUrlError();
   if (url.port && !["80", "443"].includes(url.port)) throw new UnsafeUrlError();
 
-  const hostname = normalizeHostname(url.hostname);
+  const hostname = canonicalHostname(url.hostname);
   if (!hostname || BLOCKED_HOSTS.has(hostname) || BLOCKED_HOST_SUFFIXES.some((suffix) => hostname.endsWith(suffix))) throw new UnsafeUrlError();
   const addresses = await resolvePublicAddresses(hostname, resolver);
   if (addresses.length === 0 || addresses.some((address) => !isPublicAddress(address))) throw new UnsafeUrlError();
@@ -80,7 +80,7 @@ async function resolvePublicAddresses(hostname: string, resolver: AddressResolve
 
 const systemResolver: AddressResolver = (hostname) => lookup(hostname, { all: true, verbatim: true });
 
-function normalizeHostname(hostname: string): string {
+export function canonicalHostname(hostname: string): string {
   const normalized = hostname.toLowerCase().replace(/\.$/, "");
   return normalized.startsWith("[") && normalized.endsWith("]")
     ? normalized.slice(1, -1)

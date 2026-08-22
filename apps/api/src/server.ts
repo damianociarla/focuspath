@@ -1,8 +1,9 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFileSync } from "node:fs";
-import { generateHtmlReport, ScanTimeoutError, scanFocusPath } from "focuspath";
+import { ScanTimeoutError, scanFocusPath } from "focuspath";
 import { startPinnedEgressProxy } from "./egress-proxy.js";
-import { assertPublicUrl, createPublicUrlPolicy, parseHttpUrl, UnsafeUrlError } from "./network-policy.js";
+import { assertPublicUrl, canonicalHostname, createPublicUrlPolicy, parseHttpUrl, UnsafeUrlError } from "./network-policy.js";
+import { buildScanResponse, type ScanResponseFormat } from "./scan-response.js";
 import { clientAddress, consumeRateLimits, hasValidOriginToken, SlidingWindowLimiter } from "./security.js";
 
 const port = Number(process.env.PORT ?? 8787);
@@ -18,6 +19,10 @@ const rateWindowMs = 10 * 60_000;
 const rateMax = Number(process.env.RATE_LIMIT_PER_10_MINUTES ?? 4);
 const globalRateMax = Number(process.env.GLOBAL_RATE_LIMIT_PER_HOUR ?? 60);
 const targetRateMax = Number(process.env.TARGET_RATE_LIMIT_PER_HOUR ?? 2);
+const preflightRateMax = Number(process.env.PREFLIGHT_RATE_LIMIT_PER_MINUTE ?? Math.max(12, rateMax * 3));
+const preflightGlobalRateMax = Number(process.env.PREFLIGHT_GLOBAL_RATE_LIMIT_PER_MINUTE ?? Math.max(120, globalRateMax * 2));
+const preflightClientLimiter = new SlidingWindowLimiter(preflightRateMax, 60_000);
+const preflightGlobalLimiter = new SlidingWindowLimiter(preflightGlobalRateMax, 60_000, 1);
 const clientLimiter = new SlidingWindowLimiter(rateMax, rateWindowMs);
 const globalLimiter = new SlidingWindowLimiter(globalRateMax, 60 * 60_000, 1);
 const targetLimiter = new SlidingWindowLimiter(targetRateMax, 60 * 60_000);
@@ -73,17 +78,28 @@ const server = createServer(async (request, response) => {
   let acquiredScanSlot = false;
   try {
     const body = await readJsonBody(request);
-    if (Object.keys(body).some((key) => key !== "url")) throw new UnsafeUrlError("Request body must contain only a URL.");
+    if (Object.keys(body).some((key) => !["url", "format"].includes(key))) throw new UnsafeUrlError("Request body must contain only a URL and optional response format.");
     const submitted = typeof body.url === "string" ? body.url.trim() : "";
     if (submitted.length > 2_048) throw new UnsafeUrlError("The URL must be at most 2048 characters.");
-    parseHttpUrl(submitted);
-
+    const responseFormat = body.format ?? "html";
+    if (responseFormat !== "html" && responseFormat !== "structured") throw new UnsafeUrlError("Response format must be html or structured.");
     const client = clientAddress(request);
+    parseHttpUrl(submitted);
+    const rejectedPreflight = consumeRateLimits([
+      { limiter: preflightClientLimiter, key: client },
+      { limiter: preflightGlobalLimiter, key: "all" },
+    ]);
+    if (rejectedPreflight !== null) {
+      response.setHeader("retry-after", "60");
+      json(response, 429, { error: "Too many URL validation attempts. Try again in a minute." });
+      return;
+    }
+
     const url = await assertPublicUrl(submitted);
     const rejectedLimit = consumeRateLimits([
       { limiter: clientLimiter, key: client },
       { limiter: globalLimiter, key: "all" },
-      { limiter: targetLimiter, key: url.hostname },
+      { limiter: targetLimiter, key: canonicalHostname(url.hostname) },
     ]);
     if (rejectedLimit !== null) {
       const rejected = [
@@ -114,20 +130,7 @@ const server = createServer(async (request, response) => {
       maxScreenshotHeight: 5_000,
     });
 
-    json(response, 200, {
-      url: report.url,
-      title: report.title,
-      scannedAt: report.scannedAt,
-      durationMs: report.durationMs,
-      engineVersion,
-      direction: report.direction,
-      tabPressCount: report.tabPressCount,
-      limits: report.limits,
-      stoppedBecause: report.stoppedBecause,
-      steps: report.steps,
-      issues: report.issues,
-      reportHtml: generateHtmlReport(report),
-    });
+    json(response, 200, buildScanResponse(report, engineVersion, responseFormat as ScanResponseFormat));
   } catch (error) {
     if (error instanceof UnsafeUrlError) json(response, 400, { error: error.message });
     else if (error instanceof SyntaxError) json(response, 400, { error: "Invalid JSON request." });

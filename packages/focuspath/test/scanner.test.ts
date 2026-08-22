@@ -11,6 +11,7 @@ describe("focus scanner", () => {
       direction: "reverse",
       focusSettleMs: 0,
     });
+    expect(report.version).toBe(3);
     expect(report.direction).toBe("reverse");
     expect(report.steps.map((step) => step.accessibleName)).toEqual(["Third", "Second", "First"]);
     expect(report.tabPressCount).toBe(4);
@@ -96,6 +97,23 @@ describe("focus scanner", () => {
     const sticky = report.steps.find((step) => step.selector === "#sticky");
     expect(sticky?.rect.y).toBe(0);
     expect(sticky?.visualEvidence).toEqual({ status: "plotted" });
+  });
+
+  it("interrupts smooth focus scrolling before final screenshot geometry is measured", async () => {
+    const report = await scanFocusPath(page(`<style>html{scroll-behavior:smooth}body{margin:8px}</style><button>First</button><div style="height:4000px"></div><button>Last</button>`), {
+      focusSettleMs: 0,
+      viewport: { width: 390, height: 844 },
+    });
+
+    expect(report.steps[0]).toMatchObject({
+      accessibleName: "First",
+      rect: { y: 8 },
+      visualEvidence: { status: "plotted" },
+    });
+    expect(report.steps[1]).toMatchObject({
+      accessibleName: "Last",
+      visualEvidence: { status: "outside-capture" },
+    });
   });
 
   it.each(["forward", "reverse"] as const)("uses transformed iframe quads during %s traversal", async (direction) => {
