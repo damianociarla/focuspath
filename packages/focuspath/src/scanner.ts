@@ -5,6 +5,8 @@ const DEFAULT_VIEWPORT = { width: 1440, height: 900 };
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_FOCUS_SETTLE_MS = 75;
 const DEFAULT_MAX_OPAQUE_TAB_PRESSES = 100;
+const DEFAULT_MAX_REQUESTS = 500;
+const DEFAULT_MAX_SCREENSHOT_HEIGHT = 20_000;
 const NAMED_CONTROL_ROLES = new Set([
   "button", "checkbox", "combobox", "link", "listbox", "menuitem", "menuitemcheckbox", "menuitemradio",
   "option", "radio", "searchbox", "slider", "spinbutton", "switch", "tab", "textbox", "treeitem",
@@ -51,9 +53,9 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
   if (direction !== "forward" && direction !== "reverse") throw new TypeError("direction must be either forward or reverse.");
   const traversalKey = direction === "reverse" ? "Shift+Tab" : "Tab";
   const viewport = options.viewport ?? DEFAULT_VIEWPORT;
-  const maxRequests = options.maxRequests ?? Number.POSITIVE_INFINITY;
+  const maxRequests = positiveIntegerOrInfinity(options.maxRequests ?? DEFAULT_MAX_REQUESTS, "maxRequests");
   const blockedResourceTypes = new Set(options.blockedResourceTypes ?? []);
-  const maxScreenshotHeight = options.maxScreenshotHeight ?? Number.POSITIVE_INFINITY;
+  const maxScreenshotHeight = positiveIntegerOrInfinity(options.maxScreenshotHeight ?? DEFAULT_MAX_SCREENSHOT_HEIGHT, "maxScreenshotHeight");
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const focusSettleMs = options.focusSettleMs ?? DEFAULT_FOCUS_SETTLE_MS;
   let browser: Browser | undefined;
@@ -317,7 +319,7 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
     });
 
     return {
-      version: 3,
+      version: 4,
       direction,
       url: page.url(),
       title: metadata.title,
@@ -331,6 +333,11 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
       // was requested. Report the pixels that actually exist so the overlay
       // can never extend into fabricated blank space.
       document: capturedImage,
+      capture: {
+        sourceWidth: metadata.width,
+        sourceHeight: metadata.height,
+        truncated: capturedImage.height < metadata.height,
+      },
       network: {
         requestCount,
         blockedRequestCount,
@@ -396,6 +403,11 @@ function remainingTime(startedAt: number, timeoutMs: number): number {
 function positiveInteger(value: number, name: string): number {
   if (!Number.isInteger(value) || value < 1) throw new TypeError(`${name} must be a positive integer.`);
   return value;
+}
+
+function positiveIntegerOrInfinity(value: number, name: string): number {
+  if (value === Number.POSITIVE_INFINITY) return value;
+  return positiveInteger(value, name);
 }
 
 async function settleFocus(page: Page, delayMs: number): Promise<void> {

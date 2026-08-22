@@ -7,6 +7,8 @@ export interface CliOptions {
   maxSteps: number;
   maxTabPresses: number;
   maxOpaqueTabPresses: number;
+  maxRequests: number;
+  maxScreenshotHeight: number;
   direction: TraversalDirection;
   viewport: { width: number; height: number };
   headed: boolean;
@@ -23,6 +25,9 @@ export function parseCliOptions(args: string[]): CliOptions {
       "max-steps": { type: "string", default: "50" },
       "max-tab-presses": { type: "string" },
       "max-opaque-tab-presses": { type: "string", default: "100" },
+      "max-requests": { type: "string" },
+      "max-screenshot-height": { type: "string" },
+      unlimited: { type: "boolean", default: false },
       direction: { type: "string", default: "forward" },
       viewport: { type: "string", default: "1440x900" },
       headed: { type: "boolean", default: false },
@@ -30,7 +35,7 @@ export function parseCliOptions(args: string[]): CliOptions {
     },
   });
 
-  if (values.help) return { url: "", output: values.output, maxSteps: 50, maxTabPresses: 200, maxOpaqueTabPresses: 100, direction: "forward", viewport: { width: 1440, height: 900 }, headed: values.headed, help: true };
+  if (values.help) return { url: "", output: values.output, maxSteps: 50, maxTabPresses: 200, maxOpaqueTabPresses: 100, maxRequests: 500, maxScreenshotHeight: 20_000, direction: "forward", viewport: { width: 1440, height: 900 }, headed: values.headed, help: true };
   if (positionals.length === 0) throw new Error("Missing URL. Run focuspath --help for usage.");
   if (positionals.length > 1) throw new Error(`Unexpected argument: ${positionals[1]}`);
 
@@ -42,6 +47,11 @@ export function parseCliOptions(args: string[]): CliOptions {
   if (!Number.isInteger(maxOpaqueTabPresses) || maxOpaqueTabPresses < 1 || maxOpaqueTabPresses > 5_000) throw new Error("--max-opaque-tab-presses must be an integer between 1 and 5000.");
   const direction = values.direction;
   if (direction !== "forward" && direction !== "reverse") throw new Error("--direction must be either forward or reverse.");
+  if (values.unlimited && (values["max-requests"] !== undefined || values["max-screenshot-height"] !== undefined)) {
+    throw new Error("--unlimited cannot be combined with --max-requests or --max-screenshot-height.");
+  }
+  const maxRequests = values.unlimited ? Number.POSITIVE_INFINITY : boundedInteger(values["max-requests"] ?? "500", "--max-requests", 1, 10_000);
+  const maxScreenshotHeight = values.unlimited ? Number.POSITIVE_INFINITY : boundedInteger(values["max-screenshot-height"] ?? "20000", "--max-screenshot-height", 320, 100_000);
 
   return {
     url: normalizeUrl(positionals[0] ?? ""),
@@ -49,11 +59,21 @@ export function parseCliOptions(args: string[]): CliOptions {
     maxSteps,
     maxTabPresses,
     maxOpaqueTabPresses,
+    maxRequests,
+    maxScreenshotHeight,
     direction,
     viewport: parseViewport(values.viewport),
     headed: values.headed,
     help: false,
   };
+}
+
+function boundedInteger(value: string, name: string, minimum: number, maximum: number): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) {
+    throw new Error(`${name} must be an integer between ${minimum} and ${maximum}.`);
+  }
+  return parsed;
 }
 
 function normalizeUrl(value: string): string {

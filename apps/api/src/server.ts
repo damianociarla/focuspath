@@ -90,6 +90,13 @@ const server = createServer(async (request, response) => {
     }
 
     const url = await assertPublicUrl(submitted);
+    acquiredScanSlot = tryAcquireScanSlot();
+    if (!acquiredScanSlot) {
+      response.setHeader("retry-after", "15");
+      json(response, 503, { error: "All scanners are busy. Try again shortly." });
+      return;
+    }
+
     const rejectedLimit = consumeRateLimits([
       { limiter: clientLimiter, key: client },
       { limiter: globalLimiter, key: "all" },
@@ -103,13 +110,6 @@ const server = createServer(async (request, response) => {
       ][rejectedLimit]!;
       response.setHeader("retry-after", rejected.retryAfter);
       json(response, 429, { error: rejected.error });
-      return;
-    }
-
-    acquiredScanSlot = tryAcquireScanSlot();
-    if (!acquiredScanSlot) {
-      response.setHeader("retry-after", "15");
-      json(response, 503, { error: "All scanners are busy. Try again shortly." });
       return;
     }
 

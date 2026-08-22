@@ -37,9 +37,13 @@ fi
 FOCUSPATH_CFN_ROLE_ARGS=()
 if [[ -n "${FOCUSPATH_CFN_ROLE}" ]]; then FOCUSPATH_CFN_ROLE_ARGS=(--role-arn "${FOCUSPATH_CFN_ROLE}"); fi
 
-"${FOCUSPATH_AWS[@]}" ecr get-login-password | docker login --username AWS --password-stdin "${FOCUSPATH_REGISTRY}"
-docker build --platform linux/amd64 --tag "${FOCUSPATH_IMAGE}" .
-docker push "${FOCUSPATH_IMAGE}"
+if "${FOCUSPATH_AWS[@]}" ecr describe-images --repository-name "${FOCUSPATH_REPOSITORY}" --image-ids "imageTag=${FOCUSPATH_TAG}" >/dev/null 2>&1; then
+  printf 'Reusing immutable ECR image: %s\n' "${FOCUSPATH_IMAGE}"
+else
+  "${FOCUSPATH_AWS[@]}" ecr get-login-password | docker login --username AWS --password-stdin "${FOCUSPATH_REGISTRY}"
+  docker build --platform linux/amd64 --tag "${FOCUSPATH_IMAGE}" .
+  docker push "${FOCUSPATH_IMAGE}"
+fi
 
 FOCUSPATH_WEB_ACL_ARN=""
 if [[ "${FOCUSPATH_ENABLE_WAF}" == "true" ]]; then
@@ -52,7 +56,7 @@ fi
 "${FOCUSPATH_AWS[@]}" cloudformation deploy \
   --stack-name "${FOCUSPATH_STACK}" \
   --template-file infra/aws/apprunner.yml \
-  --capabilities CAPABILITY_IAM \
+  --capabilities CAPABILITY_NAMED_IAM \
   "${FOCUSPATH_CFN_ROLE_ARGS[@]}" \
   --parameter-overrides "ImageIdentifier=${FOCUSPATH_IMAGE}" "AllowedOrigin=${FOCUSPATH_ORIGIN}" "OriginVerifyToken=${FOCUSPATH_ORIGIN_TOKEN}" "BudgetAlertEmail=${FOCUSPATH_BUDGET_EMAIL}" "WebAclArn=${FOCUSPATH_WEB_ACL_ARN}"
 

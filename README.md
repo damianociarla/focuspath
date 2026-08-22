@@ -34,6 +34,9 @@ npx focuspath localhost:3000 --viewport 390x844 --max-steps 80
 # Bound total traversal and one large opaque widget independently
 npx focuspath example.com --max-tab-presses 320 --max-opaque-tab-presses 160
 
+# Tighten network and screenshot budgets for an untrusted page
+npx focuspath example.com --max-requests 250 --max-screenshot-height 12000
+
 # Start at the end and inspect the Shift+Tab route
 npx focuspath example.com --direction reverse
 
@@ -59,6 +62,8 @@ const result = await scanFocusPath("http://localhost:3000", {
   maxSteps: 60,
   maxTabPresses: 240,
   maxOpaqueTabPresses: 120,
+  maxRequests: 500,
+  maxScreenshotHeight: 20_000,
   direction: "reverse",
   focusSettleMs: 100,
 });
@@ -112,11 +117,11 @@ Content-Type: application/json
 {"url":"https://example.com"}
 ```
 
-The default response contains report schema version, engine version, viewport and capture dimensions, traversal metadata, focus stops, findings, network restrictions, and a self-contained `reportHtml` document. Send `{"url":"https://example.com","format":"structured"}` to receive screenshot pixels directly instead of embedded HTML. Schema v3 uses `rect` for final screenshot geometry and `observedRect` for traversal-time geometry; screenshots extend beyond the first viewport up to the configured height budget. The hosted beta scans forward under a 25-second deadline and stricter quotas than the local package. It blocks font and media requests to bound cost, and reports those restrictions because fallback fonts can change layout geometry. DNS validation is preflight-limited, target keys are canonicalized, and Chromium traffic passes through a bounded local proxy that connects only to validated public IPs. Infrastructure egress filtering remains recommended defense in depth for a general-purpose service.
+The default response contains report schema version, engine version, viewport and capture dimensions, traversal metadata, focus stops, findings, network restrictions, and a self-contained `reportHtml` document. Send `{"url":"https://example.com","format":"structured"}` to receive screenshot pixels directly instead of embedded HTML. Schema v4 uses `rect` for final screenshot geometry, `observedRect` for traversal-time geometry and capture metadata to disclose truncated screenshots. The hosted beta scans forward under a 25-second deadline and stricter quotas than the local package. It blocks font and media requests to bound cost, and reports those restrictions because fallback fonts can change layout geometry. DNS validation is preflight-limited, target keys are canonicalized, and Chromium traffic passes through a bounded local proxy that connects only to validated public IPs. Infrastructure egress filtering remains recommended defense in depth for a general-purpose service.
 
 FocusPath does not intentionally persist submitted page content or generated reports. AWS and GitHub may retain request metadata according to their operational logging policies; no application-level report store is configured for the beta.
 
-The response contract and error statuses are documented in [OpenAPI 3.1](docs/openapi.yml).
+The response contract and error statuses are documented in [OpenAPI 3.1](docs/openapi.yml). Clients must ignore unknown response properties; additive optional fields may appear within `/v1`. See the [compatibility policy](docs/compatibility.md).
 
 ## Roadmap
 
