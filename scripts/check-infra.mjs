@@ -50,6 +50,11 @@ assert.match(
   /if npm view "focuspath@\$\{version\}" version >\/dev\/null 2>&1; then/,
   "npm recovery must distinguish a missing version from registry JSON error output.",
 );
+assert.match(
+  releaseWorkflow,
+  /publish-npm:[\s\S]*?npx playwright install --with-deps chromium[\s\S]*?npm publish --workspace focuspath/,
+  "The npm publish job must satisfy the package prepublish Playwright tests.",
+);
 
 for (const [path, workflow] of workflowFiles) {
   for (const match of workflow.matchAll(/^\s*-?\s*uses:\s*([^\s#]+)/gm)) {
