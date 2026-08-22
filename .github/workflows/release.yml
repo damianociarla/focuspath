@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   id-token: write
+  pages: write
 
 jobs:
   publish:
@@ -36,6 +37,67 @@ jobs:
           npm install --prefix "$install_dir" "./$package_tarball"
           "$install_dir/node_modules/.bin/focuspath" --help
       - run: npm publish --workspace focuspath
+
+  deploy-api:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: aws-actions/configure-aws-credentials@v6.2.3
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: eu-west-1
+          allowed-account-ids: ${{ vars.AWS_ACCOUNT_ID }}
+      - name: Deploy immutable API image
+        env:
+          AWS_PROFILE: ""
+          AWS_REGION: eu-west-1
+          FOCUSPATH_IMAGE_TAG: ${{ github.ref_name }}
+          FOCUSPATH_ORIGIN_VERIFY_TOKEN: ${{ secrets.FOCUSPATH_ORIGIN_VERIFY_TOKEN }}
+          FOCUSPATH_CLOUDFORMATION_ROLE_ARN: ${{ vars.AWS_CLOUDFORMATION_ROLE_ARN }}
+        run: ./infra/aws/deploy-app-runner.sh
+      - name: Verify deployed engine version
+        env:
+          API_URL: ${{ vars.VITE_API_URL }}
+        run: |
+          expected="${GITHUB_REF_NAME#v}"
+          for attempt in $(seq 1 30); do
+            actual="$(curl --fail --silent --show-error "${API_URL}/health" | node -e "let body='';process.stdin.on('data',chunk=>body+=chunk).on('end',()=>console.log(JSON.parse(body).version))" || true)"
+            if [[ "${actual}" == "${expected}" ]]; then exit 0; fi
+            sleep 10
+          done
+          echo "API did not report expected version ${expected}." >&2
+          exit 1
+
+  deploy-site:
+    needs: deploy-api
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build --workspace @focuspath/web
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: apps/web/dist
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+
+  github-release:
+    needs: deploy-site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}

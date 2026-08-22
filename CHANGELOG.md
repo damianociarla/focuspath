@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.1
+
+- Capture up to the configured 5,000px document budget through Chromium's beyond-viewport screenshot API.
+- Keep visible controls plottable when decorative overflow does not clip or scroll them.
+- Acquire scan capacity atomically and reject non-object JSON bodies with HTTP 400.
+- Record request totals, blocked requests and blocked resource types so restricted rendering is explicit in reports and API responses.
+- Display the live engine version on the website and coordinate API deployment, version health checks and Pages publication in the release pipeline.
+
 ## 0.5.0
 
 - Stabilize the final capture at scroll position zero, interrupting in-flight smooth focus scrolling before geometry and screenshot collection.

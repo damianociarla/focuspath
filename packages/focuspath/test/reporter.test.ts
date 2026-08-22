@@ -19,6 +19,7 @@ describe("reporter", () => {
       limits: { maxSteps: 50, maxTabPresses: 200, maxOpaqueTabPresses: 100 },
       viewport: { width: 1000, height: 700 },
       document: { width: 1000, height: 1200 },
+      network: { requestCount: 12, blockedRequestCount: 3, blockedResourceTypes: ["font", "media"] },
       screenshot: "data:image/jpeg;base64,test",
       stoppedBecause: "cycle-complete",
       steps: [{ index: 1, selector: "button", tagName: "button", role: "button", accessibleName: "", tabIndex: 0, href: null, rect: { x: 20, y: 30, width: 100, height: 40 }, focusIndicator: { outline: "2px solid black", boxShadow: "none" } }],
@@ -36,6 +37,8 @@ describe("reporter", () => {
     expect(html).toContain("<dt>Tab presses</dt><dd>2</dd>");
     expect(html).toContain("<dt>direction</dt><dd>reverse</dd>");
     expect(html).toContain("limits: 50 stops / 200 Tab presses / 100 per opaque host");
+    expect(html).toContain("Rendered with network restrictions.");
+    expect(html).toContain("3 requests were blocked");
   });
 
   it("does not place scroll-container steps over a different screenshot state", () => {

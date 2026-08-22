@@ -20,6 +20,19 @@ Requirements: AWS CLI authenticated, Docker running, and permission to manage EC
 AWS_PROFILE=portfolio-bootstrap AWS_REGION=eu-west-1 ./infra/aws/deploy-app-runner.sh
 ```
 
+## Release automation
+
+Tagged releases use GitHub OIDC—without long-lived AWS keys—to deploy the immutable API image, require `/health` to report the tag version, and only then publish GitHub Pages and the GitHub Release. Bootstrap the roles once:
+
+```bash
+aws cloudformation deploy --profile portfolio-bootstrap --region eu-west-1 \
+  --stack-name focuspath-github-deploy \
+  --template-file infra/aws/github-deploy-role.yml \
+  --capabilities CAPABILITY_NAMED_IAM
+```
+
+Configure repository variables `AWS_DEPLOY_ROLE_ARN`, `AWS_CLOUDFORMATION_ROLE_ARN`, `AWS_ACCOUNT_ID`, and the repository secret `FOCUSPATH_ORIGIN_VERIFY_TOKEN` from the stack outputs and the existing ignored origin-token file. The trust policy accepts only version tags from `damianociarla/focuspath`.
+
 The script:
 
 1. Creates an immutable, scan-on-push ECR repository if needed.

@@ -16,6 +16,7 @@ export function buildScanResponse(report: FocusReport, engineVersion: string, fo
     limits: report.limits,
     viewport: report.viewport,
     capture: report.document,
+    network: report.network,
     stoppedBecause: report.stoppedBecause,
     steps: report.steps,
     issues: report.issues,

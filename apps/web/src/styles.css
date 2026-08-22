@@ -17,3 +17,4 @@
 footer nav{display:flex;gap:22px;color:var(--ink)}
 footer nav a,.scan-notes a{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
 @media(max-width:600px){.nav nav{gap:15px}.nav nav a:first-child{display:none}.result-metrics{gap:18px;flex-wrap:wrap}footer{align-items:flex-start;flex-direction:column;justify-content:center;gap:24px}}
+.result-title [data-result-engine]{margin-left:12px;color:var(--muted)}

@@ -69,12 +69,6 @@ const server = createServer(async (request, response) => {
     return;
   }
 
-  if (activeScans >= maxConcurrentScans) {
-    response.setHeader("retry-after", "15");
-    json(response, 503, { error: "All scanners are busy. Try again shortly." });
-    return;
-  }
-
   let acquiredScanSlot = false;
   try {
     const body = await readJsonBody(request);
@@ -112,8 +106,12 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    activeScans += 1;
-    acquiredScanSlot = true;
+    acquiredScanSlot = tryAcquireScanSlot();
+    if (!acquiredScanSlot) {
+      response.setHeader("retry-after", "15");
+      json(response, 503, { error: "All scanners are busy. Try again shortly." });
+      return;
+    }
 
     const report = await scanFocusPath(url.toString(), {
       headless: true,
@@ -157,6 +155,12 @@ function json(response: ServerResponse, status: number, body: unknown): void {
   }).end(payload);
 }
 
+function tryAcquireScanSlot(): boolean {
+  if (activeScans >= maxConcurrentScans) return false;
+  activeScans += 1;
+  return true;
+}
+
 async function readJsonBody(request: IncomingMessage): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = [];
   let size = 0;
@@ -166,5 +170,9 @@ async function readJsonBody(request: IncomingMessage): Promise<Record<string, un
     if (size > 4096) throw new SyntaxError("Request body too large.");
     chunks.push(buffer);
   }
-  return JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
+  const body: unknown = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    throw new UnsafeUrlError("Request body must be a JSON object.");
+  }
+  return body as Record<string, unknown>;
 }

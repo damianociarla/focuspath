@@ -33,7 +33,7 @@ type ObservedFocusStep = FocusStep & {
   opaqueCandidate: boolean;
 };
 
-type NodeGeometry = { rect: FocusRect; quad: number[] };
+type NodeGeometry = { rect: FocusRect; quad: number[]; clippedByAncestor: boolean };
 
 export class ScanTimeoutError extends Error {
   constructor(timeoutMs: number) {
@@ -103,18 +103,26 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
     });
     const cdp = await page.context().newCDPSession(page);
     let requestCount = 0;
+    let routedRequestCount = 0;
+    let blockedRequestCount = 0;
+    page.on("request", () => requestCount += 1);
     if (options.isUrlAllowed || Number.isFinite(maxRequests) || blockedResourceTypes.size > 0) {
       await page.route("**/*", async (route) => {
         try {
-          requestCount += 1;
-          if (requestCount > maxRequests || blockedResourceTypes.has(route.request().resourceType())) {
+          routedRequestCount += 1;
+          if (routedRequestCount > maxRequests || blockedResourceTypes.has(route.request().resourceType())) {
+            blockedRequestCount += 1;
             await route.abort("blockedbyclient");
             return;
           }
           const allowed = await options.isUrlAllowed?.(route.request().url());
           if (allowed ?? true) await route.continue();
-          else await route.abort("blockedbyclient");
+          else {
+            blockedRequestCount += 1;
+            await route.abort("blockedbyclient");
+          }
         } catch {
+          blockedRequestCount += 1;
           await route.abort("blockedbyclient");
         }
       });
@@ -288,11 +296,14 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
       }));
     const captureWidth = Math.max(1, Math.min(metadata.width, viewport.width));
     const captureHeight = Math.max(1, Math.min(metadata.height, maxScreenshotHeight));
-    const screenshot = await page.screenshot({
-      clip: { x: 0, y: 0, width: captureWidth, height: captureHeight },
-      type: "jpeg",
+    const captured = await cdp.send("Page.captureScreenshot", {
+      format: "jpeg",
       quality: 78,
+      fromSurface: true,
+      captureBeyondViewport: true,
+      clip: { x: 0, y: 0, width: captureWidth, height: captureHeight, scale: 1 },
     });
+    const screenshot = Buffer.from(captured.data, "base64");
     const capturedImage = jpegDimensions(screenshot) ?? { width: captureWidth, height: captureHeight };
     const finalSteps = steps.map((step, index) => {
       const geometry = finalGeometry[index];
@@ -301,7 +312,7 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
         : { ...step, observedRect: step.rect };
       return {
         ...nextStep,
-        visualEvidence: classifyVisualEvidence(nextStep, capturedImage, geometry !== null),
+        visualEvidence: classifyVisualEvidence(nextStep, capturedImage, geometry !== null, geometry?.clippedByAncestor ?? false),
       };
     });
 
@@ -320,6 +331,11 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
       // was requested. Report the pixels that actually exist so the overlay
       // can never extend into fabricated blank space.
       document: capturedImage,
+      network: {
+        requestCount,
+        blockedRequestCount,
+        blockedResourceTypes: [...blockedResourceTypes].sort(),
+      },
       steps: finalSteps,
       issues,
       screenshot: `data:image/jpeg;base64,${screenshot.toString("base64")}`,
@@ -602,7 +618,7 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
       while (true) {
         let ancestor = composedParent(current);
         while (ancestor) {
-          if (isHtmlElement(ancestor) && isScrollableElement(ancestor)) {
+          if (isHtmlElement(ancestor) && isRelevantScrollContext(ancestor, current)) {
             contexts.push({
               kind: "element",
               selector: uniqueSelector(ancestor),
@@ -636,12 +652,17 @@ async function readActiveElement(page: Page, cdp: CDPSession, index: number): Pr
       return contexts;
     }
 
-    function isScrollableElement(node: HTMLElement): boolean {
+    function isRelevantScrollContext(node: HTMLElement, focused: Element): boolean {
       const view = node.ownerDocument.defaultView;
       const styles = view?.getComputedStyle(node) ?? getComputedStyle(node);
       const scrollsX = /(auto|scroll|overlay|hidden|clip)/.test(styles.overflowX) && node.scrollWidth > node.clientWidth;
       const scrollsY = /(auto|scroll|overlay|hidden|clip)/.test(styles.overflowY) && node.scrollHeight > node.clientHeight;
-      return scrollsX || scrollsY;
+      if (!scrollsX && !scrollsY) return false;
+      if (node.scrollLeft !== 0 || node.scrollTop !== 0) return true;
+      const rect = focused.getBoundingClientRect();
+      const clip = node.getBoundingClientRect();
+      return (scrollsX && (rect.left < clip.left || rect.right > clip.right))
+        || (scrollsY && (rect.top < clip.top || rect.bottom > clip.bottom));
     }
 
     function composedParent(node: Element): Element | null {
@@ -702,8 +723,36 @@ async function readNodeGeometry(cdp: CDPSession, backendNodeId: number): Promise
     const top = Math.min(...ys);
     const right = Math.max(...xs);
     const bottom = Math.max(...ys);
+    const { object } = await cdp.send("DOM.resolveNode", { backendNodeId });
+    const clippedByAncestor = object.objectId
+      ? (await cdp.send("Runtime.callFunctionOn", {
+          objectId: object.objectId,
+          returnByValue: true,
+          functionDeclaration: `function () {
+            if (!(this instanceof Element)) return true;
+            let current = this;
+            const targetRect = this.getBoundingClientRect();
+            while (current) {
+              const root = current.getRootNode();
+              const parent = current.parentElement || (root instanceof ShadowRoot ? root.host : null);
+              if (!parent) break;
+              const style = getComputedStyle(parent);
+              const clipsX = /(auto|scroll|overlay|hidden|clip)/.test(style.overflowX);
+              const clipsY = /(auto|scroll|overlay|hidden|clip)/.test(style.overflowY);
+              if (clipsX || clipsY) {
+                const clip = parent.getBoundingClientRect();
+                if ((clipsX && (targetRect.left < clip.left || targetRect.right > clip.right)) ||
+                    (clipsY && (targetRect.top < clip.top || targetRect.bottom > clip.bottom))) return true;
+              }
+              current = parent;
+            }
+            return false;
+          }`,
+        })).result.value === true
+      : true;
     return {
       quad,
+      clippedByAncestor,
       rect: {
         x: left,
         y: top,
@@ -720,11 +769,13 @@ function classifyVisualEvidence(
   step: FocusStep,
   capture: { width: number; height: number },
   geometryAvailable: boolean,
+  clippedByAncestor: boolean,
 ): VisualEvidence {
   if ((step.scrollContexts?.length ?? 0) > 0 || step.scrollContext) {
     return { status: "sequence-only", reason: "scroll-or-clipping-context" };
   }
   if (!geometryAvailable) return { status: "sequence-only", reason: "geometry-unavailable" };
+  if (clippedByAncestor) return { status: "sequence-only", reason: "scroll-or-clipping-context" };
 
   const left = step.rect.x;
   const top = step.rect.y;
