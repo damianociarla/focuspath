@@ -99,6 +99,7 @@ jobs:
           for attempt in $(seq 1 30); do
             actual="$(curl --fail --silent --show-error "${API_URL}/health" | node -e "let body='';process.stdin.on('data',chunk=>body+=chunk).on('end',()=>console.log(JSON.parse(body).version))" || true)"
             if [[ "${actual}" == "${expected}" ]]; then exit 0; fi
+            echo "Health check attempt ${attempt}/30 reported '${actual:-unavailable}', expected '${expected}'."
             sleep 10
           done
           echo "API did not report expected version ${expected}." >&2
