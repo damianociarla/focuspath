@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.1
+
+- Route both tag releases and manual recovery through a protected GitHub environment so every AWS deployment emits the same immutable OIDC subject.
+- Exercise AWS role assumption before the idempotent API preflight, covering the real recovery path instead of only the healthy-API skip.
+- Move the bounded App Runner ECR role into the bootstrap stack and reduce the application CloudFormation role to exact `GetRole` and `PassRole` access.
+- Repair the Dependabot configuration and validate every GitHub YAML file plus workflow shell with pinned, checksum-verified `actionlint`.
+
 ## 0.6.0
 
 - Bound local scans to 500 requests and 20,000 screenshot pixels by default, expose both CLI limits, and require an explicit `--unlimited` opt-out.
