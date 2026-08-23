@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.5
+
+- Restrict the TypeScript scanner to HTTP(S) by default and require an explicit trusted-input opt-in for local protocols.
+- Validate saved report objects at runtime before interpolating enum, numeric, SVG, CSS, or screenshot fields into portable HTML.
+- Recover the deployed version from CloudFormation when API health is unavailable and fail closed for unapproved recovery with unknown state.
+- Document the difference between request callbacks and the hosted service's DNS-pinned SSRF boundary.
+
 ## 0.6.4
 
 - Reject embedded URL credentials in both the CLI and TypeScript scanner, and defensively redact userinfo from legacy report objects.

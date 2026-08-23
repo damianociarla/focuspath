@@ -76,6 +76,10 @@ const result = await scanFocusPath("http://localhost:3000", {
 const html = generateHtmlReport(result);
 ```
 
+`scanFocusPath` accepts only absolute HTTP(S) URLs by default. Trusted fixtures or local files require the explicit `allowLocalProtocols: true` option; never enable it for user-controlled input. `isUrlAllowed` can block browser requests, but it is not a complete SSRF boundary by itself because it does not pin DNS or constrain egress like the hosted AWS proxy.
+
+`generateHtmlReport` validates saved reports at runtime before rendering them, including schema enums, finite geometry, limits, findings, and raster screenshot data URLs. Invalid or tampered JSON throws a `TypeError` instead of producing a report.
+
 ## Development
 
 Requirements: Node.js 24+. This is an intentional project baseline so the CLI, CI, Playwright container, and release workflow use the same runtime; broader compatibility can be considered once it has its own tested matrix.
