@@ -43,6 +43,7 @@ describe("website accessibility contract", () => {
     assert.match(html, /<summary>Privacy and scan limitations<\/summary>/);
     assert.match(html, /does not certify WCAG conformance/);
     assert.match(html, /does not intentionally persist page content or reports/);
+    assert.match(html, /Query strings, screenshots, accessible names and report content can be sensitive/);
     assert.match(html, /data-result-engine/);
   });
 
@@ -55,6 +56,8 @@ describe("website accessibility contract", () => {
     assert.match(docs, /custom element without an open shadow root is only treated as a candidate/);
     assert.match(docs, /OpenAPI specification/);
     assert.match(docs, /blocks font and media requests/);
+    assert.match(docs, /Embedded URL credentials are rejected/);
+    assert.match(docs, /Query strings, screenshots, accessible names and rendered report content may contain sensitive data/);
     assert.match(docs, /import \{ scanFocusPath, generateHtmlReport \} from "focuspath"/);
     assert.match(docs, /const html = generateHtmlReport\(report\)/);
     assert.doesNotMatch(docs, /renderHtmlReport/);

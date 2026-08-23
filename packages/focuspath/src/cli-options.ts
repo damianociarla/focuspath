@@ -83,10 +83,23 @@ function boundedInteger(value: string, name: string, minimum: number, maximum: n
 
 function normalizeUrl(value: string): string {
   if (/^[a-z][a-z\d+.-]*:\/\//i.test(value) && !/^https?:\/\//i.test(value)) throw new Error("Only http and https URLs are supported.");
-  const candidate = /^https?:\/\//i.test(value) ? value : `http://${value}`;
+  const hasExplicitProtocol = /^https?:\/\//i.test(value);
+  const candidate = hasExplicitProtocol ? value : `https://${value}`;
   const parsed = new URL(candidate);
   if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("Only http and https URLs are supported.");
+  if (parsed.username || parsed.password) throw new Error("URLs containing embedded credentials are not supported.");
+  if (!hasExplicitProtocol && isLocalHostname(parsed.hostname)) parsed.protocol = "http:";
   return parsed.toString();
+}
+
+function isLocalHostname(hostname: string): boolean {
+  const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
+  return normalized === "localhost"
+    || normalized.endsWith(".localhost")
+    || normalized.endsWith(".local")
+    || normalized === "::1"
+    || /^127(?:\.\d{1,3}){3}$/.test(normalized)
+    || !normalized.includes(".");
 }
 
 function parseViewport(value: string): { width: number; height: number } {

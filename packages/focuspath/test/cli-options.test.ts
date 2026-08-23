@@ -4,7 +4,7 @@ import { parseCliOptions } from "../src/cli-options.js";
 describe("CLI options", () => {
   it("does not mistake an option value for the URL", () => {
     const parsed = parseCliOptions(["--output", "/tmp/report.html", "example.com"]);
-    expect(parsed.url).toBe("http://example.com/");
+    expect(parsed.url).toBe("https://example.com/");
     expect(parsed.output).toBe("/tmp/report.html");
   });
 
@@ -31,6 +31,23 @@ describe("CLI options", () => {
 
   it("rejects an explicit non-HTTP protocol", () => {
     expect(() => parseCliOptions(["ftp://example.com"])).toThrow(/Only http and https/);
+  });
+
+  it("defaults public hosts to HTTPS and local hosts to HTTP", () => {
+    expect(parseCliOptions(["example.com"]).url).toBe("https://example.com/");
+    expect(parseCliOptions(["localhost:3000"]).url).toBe("http://localhost:3000/");
+    expect(parseCliOptions(["127.0.0.1:4173"]).url).toBe("http://127.0.0.1:4173/");
+    expect(parseCliOptions(["[::1]:8080"]).url).toBe("http://[::1]:8080/");
+    expect(parseCliOptions(["https://localhost:3000"]).url).toBe("https://localhost:3000/");
+  });
+
+  it("rejects embedded URL credentials without echoing them", () => {
+    expect(() => parseCliOptions(["https://user:secret@example.com"])).toThrow("URLs containing embedded credentials are not supported.");
+    try {
+      parseCliOptions(["https://user:secret@example.com"]);
+    } catch (error) {
+      expect(String(error)).not.toContain("secret");
+    }
   });
 
   it("derives a total Tab budget from the observed step limit", () => {

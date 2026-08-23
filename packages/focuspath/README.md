@@ -33,6 +33,8 @@ Node.js 24+ is the intentional tested runtime for the CLI and library.
 
 The command exits with code `1` when an error finding is present, `2` when scanning fails, and `0` otherwise.
 
+URLs without a scheme default to HTTPS for public hosts and HTTP for local development hosts. Embedded URL credentials are rejected by both the CLI and `scanFocusPath`. Query strings, screenshots, accessible names, and rendered page content may still be sensitive; protect and review HTML reports before sharing them.
+
 ## TypeScript API
 
 ```ts

@@ -44,6 +44,20 @@ after(async () => {
 });
 
 describe("documentation responsive layout", () => {
+  it("keeps the primary hero action usable in a compact first viewport", async () => {
+    const page = await browser.newPage({ viewport: { width: 375, height: 667 } });
+    await page.goto(`${origin}/index.html`, { waitUntil: "networkidle" });
+    await page.evaluate(() => document.fonts.ready);
+    const layout = await page.evaluate(() => {
+      const primary = document.querySelector(".hero-actions .primary").getBoundingClientRect();
+      const secondary = document.querySelector(".hero-actions .text-link").getBoundingClientRect();
+      return { viewportHeight: window.innerHeight, primaryBottom: primary.bottom, secondaryBottom: secondary.bottom };
+    });
+    assert.ok(layout.primaryBottom <= layout.viewportHeight, `primary CTA ends at ${layout.primaryBottom}px in a ${layout.viewportHeight}px viewport`);
+    assert.ok(layout.secondaryBottom <= layout.viewportHeight, `secondary CTA ends at ${layout.secondaryBottom}px in a ${layout.viewportHeight}px viewport`);
+    await page.close();
+  });
+
   it("contains long commands inside the 390px production layout", async () => {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
     await page.goto(`${origin}/docs.html`, { waitUntil: "networkidle" });

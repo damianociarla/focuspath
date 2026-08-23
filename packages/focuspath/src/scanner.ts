@@ -45,6 +45,7 @@ export class ScanTimeoutError extends Error {
 }
 
 export async function scanFocusPath(url: string, options: ScanOptions = {}): Promise<FocusReport> {
+  assertNoEmbeddedCredentials(url);
   const startedAt = Date.now();
   const maxSteps = positiveInteger(options.maxSteps ?? 50, "maxSteps");
   const maxTabPresses = positiveInteger(options.maxTabPresses ?? maxSteps * 4, "maxTabPresses");
@@ -363,6 +364,18 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
       closeBrowser(),
       new Promise<void>((resolve) => setTimeout(resolve, 1_000)),
     ]);
+  }
+}
+
+function assertNoEmbeddedCredentials(value: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return;
+  }
+  if (parsed.username || parsed.password) {
+    throw new TypeError("URLs containing embedded credentials are not supported.");
   }
 }
 

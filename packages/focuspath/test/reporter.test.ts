@@ -7,6 +7,30 @@ describe("reporter", () => {
     expect(escapeHtml(`<script>alert("x")</script>`)).toBe("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;");
   });
 
+  it("redacts embedded credentials from legacy report URLs", () => {
+    const report = {
+      version: 4,
+      direction: "forward",
+      url: "https://user:secret@example.com/private?token=query-value",
+      title: "",
+      scannedAt: "2026-08-23T00:00:00.000Z",
+      durationMs: 1,
+      tabPressCount: 0,
+      limits: { maxSteps: 50, maxTabPresses: 200, maxOpaqueTabPresses: 100 },
+      viewport: { width: 800, height: 600 },
+      document: { width: 800, height: 600 },
+      screenshot: "data:image/jpeg;base64,test",
+      stoppedBecause: "no-focusable-elements",
+      steps: [],
+      issues: [],
+    } satisfies FocusReport;
+
+    const html = generateHtmlReport(report);
+    expect(html).not.toContain("user");
+    expect(html).not.toContain("secret");
+    expect(html).toContain("https://example.com/private?token=query-value");
+  });
+
   it("renders focus nodes and issues", () => {
     const report: FocusReport = {
       version: 2,
