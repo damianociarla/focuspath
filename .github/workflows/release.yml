@@ -10,11 +10,16 @@ on:
         description: Existing version tag to recover or retry
         required: true
         type: string
+      allow_downgrade:
+        description: Intentionally roll production back to an older tag
+        required: true
+        default: false
+        type: boolean
 
 permissions: {}
 
 concurrency:
-  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  group: focuspath-production-release
   cancel-in-progress: false
 
 env:
@@ -56,7 +61,7 @@ jobs:
       contents: read
       id-token: write
     runs-on: ubuntu-latest
-    environment: production
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_downgrade && 'production-rollback' || 'production' }}
     steps:
       - uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
@@ -67,12 +72,23 @@ jobs:
         id: api-state
         env:
           API_URL: ${{ vars.VITE_API_URL }}
+          ALLOW_DOWNGRADE: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_downgrade || false }}
         run: |
           expected="${RELEASE_TAG#v}"
           actual="$(curl --fail --silent --show-error "${API_URL}/health" | node -e "let body='';process.stdin.on('data',chunk=>body+=chunk).on('end',()=>console.log(JSON.parse(body).version))" || true)"
           if [[ "${actual}" == "${expected}" ]]; then
             echo "deploy=false" >> "${GITHUB_OUTPUT}"
             echo "API already reports ${expected}; skipping AWS deployment."
+          elif [[ -n "${actual}" ]]; then
+            ordering="$(node -e 'const values=process.argv.slice(1).map((value)=>{const match=/^(\d+)\.(\d+)\.(\d+)$/.exec(value);if(!match)throw new Error(`Invalid release version: ${value}`);return match.slice(1).map(Number)});let result=0;for(let index=0;index<3;index+=1){if(values[0][index]!==values[1][index]){result=values[0][index]>values[1][index]?1:-1;break}}process.stdout.write(String(result))' "${actual}" "${expected}")"
+            if [[ "${ordering}" == "1" && "${ALLOW_DOWNGRADE}" != "true" ]]; then
+              echo "Refusing to downgrade production from ${actual} to ${expected}. Retry manually with allow_downgrade only for an intentional rollback." >&2
+              exit 1
+            fi
+            if [[ "${ordering}" == "1" ]]; then
+              echo "Approved rollback from ${actual} to ${expected} through the protected rollback environment."
+            fi
+            echo "deploy=true" >> "${GITHUB_OUTPUT}"
           else
             echo "deploy=true" >> "${GITHUB_OUTPUT}"
           fi
