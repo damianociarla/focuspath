@@ -80,7 +80,7 @@ jobs:
             echo "deploy=false" >> "${GITHUB_OUTPUT}"
             echo "API already reports ${expected}; skipping AWS deployment."
           elif [[ -n "${actual}" ]]; then
-            ordering="$(node -e 'const values=process.argv.slice(1).map((value)=>{const match=/^(\d+)\.(\d+)\.(\d+)$/.exec(value);if(!match)throw new Error(`Invalid release version: ${value}`);return match.slice(1).map(Number)});let result=0;for(let index=0;index<3;index+=1){if(values[0][index]!==values[1][index]){result=values[0][index]>values[1][index]?1:-1;break}}process.stdout.write(String(result))' "${actual}" "${expected}")"
+            ordering="$(node -e 'const values=process.argv.slice(1).map((value)=>{const match=/^(\d+)\.(\d+)\.(\d+)$/.exec(value);if(!match)throw new Error("Invalid release version: "+value);return match.slice(1).map(Number)});let result=0;for(let index=0;index<3;index+=1){if(values[0][index]!==values[1][index]){result=values[0][index]>values[1][index]?1:-1;break}}process.stdout.write(String(result))' "${actual}" "${expected}")"
             if [[ "${ordering}" == "1" && "${ALLOW_DOWNGRADE}" != "true" ]]; then
               echo "Refusing to downgrade production from ${actual} to ${expected}. Retry manually with allow_downgrade only for an intentional rollback." >&2
               exit 1
