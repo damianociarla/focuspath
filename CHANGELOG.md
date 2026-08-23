@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.3
+
+- Compare release versions with tested SemVer 2.0.0 precedence, including prereleases and build metadata.
+- Verify the version comparator behavior in CI instead of relying only on workflow text guardrails.
+- Add `focuspath -V` and `focuspath --version`, and exercise the installed tarball version during release validation.
+- Normalize SemVer build metadata into valid immutable ECR image tags.
+- Describe the personal-repository rollback gate precisely as owner confirmation rather than independent review.
+
 ## 0.6.2
 
 - Serialize every production release and recovery run so an older workflow cannot overtake a newer deployment.

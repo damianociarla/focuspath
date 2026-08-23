@@ -13,6 +13,11 @@ const directory = await mkdtemp(join(tmpdir(), "focuspath-dev-"));
 const reportPath = join(directory, "report.html");
 
 try {
+  const versionResult = await run("npm", ["run", "dev", "--", "--version"]);
+  const packageMetadata = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  assert.equal(versionResult.code, 0, `Development CLI version failed:\n${versionResult.stderr}`);
+  assert.equal(versionResult.stdout.trim().split("\n").at(-1), packageMetadata.version);
+
   await new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(0, "127.0.0.1", resolve);

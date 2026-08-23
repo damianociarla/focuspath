@@ -42,7 +42,7 @@ aws cloudformation deploy --profile portfolio-bootstrap --region eu-west-1 \
     ExistingGitHubOidcProviderArn=arn:aws:iam::<account-id>:oidc-provider/token.actions.githubusercontent.com
 ```
 
-Configure repository variables `AWS_DEPLOY_ROLE_ARN`, `AWS_CLOUDFORMATION_ROLE_ARN`, `AWS_APPLICATION_ROLE_ARN`, `AWS_ACCOUNT_ID`, and the repository secret `FOCUSPATH_ORIGIN_VERIFY_TOKEN` from the stack outputs and the existing ignored origin-token file. Normal releases and recovery use the protected `production` environment. Intentional downgrades use the separate `production-rollback` environment, which requires a reviewer and disables administrator bypass. The AWS trust accepts only those two exact environment subjects from `damianociarla/focuspath` and uses GitHub's immutable owner and repository IDs. Override `GitHubOwnerId`, `GitHubRepositoryId`, `ReleaseEnvironmentName`, and `RollbackEnvironmentName` when reusing this template for another repository.
+Configure repository variables `AWS_DEPLOY_ROLE_ARN`, `AWS_CLOUDFORMATION_ROLE_ARN`, `AWS_APPLICATION_ROLE_ARN`, `AWS_ACCOUNT_ID`, and the repository secret `FOCUSPATH_ORIGIN_VERIFY_TOKEN` from the stack outputs and the existing ignored origin-token file. Normal releases and recovery use the protected `production` environment. Intentional downgrades use the separate `production-rollback` environment, which requires an owner confirmation and disables administrator bypass. In this personal repository the initiator may confirm their own rollback; enable independent review once a second maintainer is available. The AWS trust accepts only those two exact environment subjects from `damianociarla/focuspath` and uses GitHub's immutable owner and repository IDs. Override `GitHubOwnerId`, `GitHubRepositoryId`, `ReleaseEnvironmentName`, and `RollbackEnvironmentName` when reusing this template for another repository.
 
 Verify the repository OIDC subject configuration before changing the AWS trust policy:
 
@@ -77,7 +77,7 @@ gh workflow run release.yml --repo damianociarla/focuspath --ref main \
   -f tag=v0.6.0 -f allow_downgrade=true
 ```
 
-That path pauses at the protected `production-rollback` environment for human approval. The ordinary AWS deploy job remains automated through `production`; both paths assume the AWS role before checking whether the API already matches, deliberately exercising OIDC even on the idempotent no-deploy path. The production deployment policy admits protected `main` and `v*` refs, while rollback admits only `main`.
+That path pauses at the protected `production-rollback` environment for explicit owner confirmation. The ordinary AWS deploy job remains automated through `production`; both paths assume the AWS role before checking whether the API already matches, deliberately exercising OIDC even on the idempotent no-deploy path. The production deployment policy admits protected `main` and `v*` refs, while rollback admits only `main`.
 
 The script:
 

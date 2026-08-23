@@ -54,6 +54,7 @@ jobs:
           install_dir="$(mktemp -d)"
           npm install --prefix "$install_dir" "./$package_tarball"
           "$install_dir/node_modules/.bin/focuspath" --help
+          [[ "$("$install_dir/node_modules/.bin/focuspath" --version)" == "${RELEASE_TAG#v}" ]]
 
   deploy-api:
     needs: validate
@@ -63,6 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_downgrade && 'production-rollback' || 'production' }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
@@ -80,7 +82,7 @@ jobs:
             echo "deploy=false" >> "${GITHUB_OUTPUT}"
             echo "API already reports ${expected}; skipping AWS deployment."
           elif [[ -n "${actual}" ]]; then
-            ordering="$(node -e 'const values=process.argv.slice(1).map((value)=>{const match=/^(\d+)\.(\d+)\.(\d+)$/.exec(value);if(!match)throw new Error("Invalid release version: "+value);return match.slice(1).map(Number)});let result=0;for(let index=0;index<3;index+=1){if(values[0][index]!==values[1][index]){result=values[0][index]>values[1][index]?1:-1;break}}process.stdout.write(String(result))' "${actual}" "${expected}")"
+            ordering="$(node scripts/compare-semver.mjs "${actual}" "${expected}")"
             if [[ "${ordering}" == "1" && "${ALLOW_DOWNGRADE}" != "true" ]]; then
               echo "Refusing to downgrade production from ${actual} to ${expected}. Retry manually with allow_downgrade only for an intentional rollback." >&2
               exit 1

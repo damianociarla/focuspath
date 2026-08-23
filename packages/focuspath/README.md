@@ -23,6 +23,8 @@ focuspath <url> [options]
 --direction <forward|reverse> Keyboard traversal direction (default: forward)
 --viewport <width>x<height>  Browser viewport (default: 1440x900)
 --headed                     Show Chromium while scanning
+-V, --version               Show the installed FocusPath version
+-h, --help                  Show command help
 ```
 
 If Chromium is not installed yet, run `npx playwright install chromium`.

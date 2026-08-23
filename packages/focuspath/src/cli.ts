@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import process from "node:process";
 import { parseCliOptions } from "./cli-options.js";
@@ -22,6 +22,7 @@ Options:
   --direction <forward|reverse> Keyboard traversal direction (default: forward)
   --viewport <width>x<height> (default: 1440x900)
   --headed                 Show the browser while scanning
+  -V, --version            Show the installed FocusPath version
   -h, --help               Show this help
 `;
 
@@ -35,6 +36,11 @@ async function main(): Promise<void> {
   const options = parseCliOptions(args);
   if (options.help) {
     console.log(HELP);
+    return;
+  }
+  if (options.version) {
+    const packageMetadata = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
+    console.log(packageMetadata.version);
     return;
   }
 

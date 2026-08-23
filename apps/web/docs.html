@@ -31,7 +31,7 @@
 
     <main id="documentation" tabindex="-1">
       <section class="docs-hero" aria-labelledby="docs-title">
-        <div><p class="eyebrow">Documentation / v0.6.2</p><h1 id="docs-title">Map the route.<br /><em>Keep the evidence.</em></h1></div>
+        <div><p class="eyebrow">Documentation / v0.6.3</p><h1 id="docs-title">Map the route.<br /><em>Keep the evidence.</em></h1></div>
         <div class="hero-note"><p>FocusPath follows Tab or Shift+Tab navigation in a real Chromium session, records observable focus stops, and produces a portable HTML report.</p><div><a class="action" href="#install">Install</a><a href="https://github.com/damianociarla/focuspath/blob/main/docs/openapi.yml">OpenAPI ↗</a></div></div>
       </section>
 
@@ -43,9 +43,10 @@
             <p>Run once with <code>npx</code>, or install the package in a project. The CLI writes a self-contained HTML report by default.</p>
             <pre><code>npx focuspath https://example.com
 npm install --save-dev focuspath
-npx focuspath https://example.com --output ./focus-report.html</code></pre>
+npx focuspath https://example.com --output ./focus-report.html
+npx focuspath --version</code></pre>
             <h3>Traversal budgets</h3>
-            <dl class="option-list"><div><dt><code>--direction</code></dt><dd>Use <strong>forward</strong> for Tab or <strong>reverse</strong> for Shift+Tab. Default: <strong>forward</strong>.</dd></div><div><dt><code>--max-steps</code></dt><dd>Maximum observable focus stops. Default: <strong>50</strong>.</dd></div><div><dt><code>--max-tab-presses</code></dt><dd>Total keyboard traversal presses, including movement hidden inside opaque hosts. Default: <strong>200</strong>.</dd></div><div><dt><code>--max-opaque-tab-presses</code></dt><dd>Repeated presses tolerated at one opaque host. Default: <strong>100</strong>.</dd></div><div><dt><code>--max-requests</code></dt><dd>Maximum page requests. Default: <strong>500</strong>.</dd></div><div><dt><code>--max-screenshot-height</code></dt><dd>Maximum screenshot height. Default: <strong>20,000px</strong>.</dd></div><div><dt><code>--unlimited</code></dt><dd>Explicitly removes request and screenshot-height limits. Use only for trusted pages.</dd></div></dl>
+            <dl class="option-list"><div><dt><code>--direction</code></dt><dd>Use <strong>forward</strong> for Tab or <strong>reverse</strong> for Shift+Tab. Default: <strong>forward</strong>.</dd></div><div><dt><code>--max-steps</code></dt><dd>Maximum observable focus stops. Default: <strong>50</strong>.</dd></div><div><dt><code>--max-tab-presses</code></dt><dd>Total keyboard traversal presses, including movement hidden inside opaque hosts. Default: <strong>200</strong>.</dd></div><div><dt><code>--max-opaque-tab-presses</code></dt><dd>Repeated presses tolerated at one opaque host. Default: <strong>100</strong>.</dd></div><div><dt><code>--max-requests</code></dt><dd>Maximum page requests. Default: <strong>500</strong>.</dd></div><div><dt><code>--max-screenshot-height</code></dt><dd>Maximum screenshot height. Default: <strong>20,000px</strong>.</dd></div><div><dt><code>--unlimited</code></dt><dd>Explicitly removes request and screenshot-height limits. Use only for trusted pages.</dd></div><div><dt><code>-V, --version</code></dt><dd>Prints the installed FocusPath version without starting Chromium.</dd></div></dl>
           </section>
 
           <section id="library" aria-labelledby="library-title">
