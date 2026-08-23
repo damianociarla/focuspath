@@ -89,6 +89,7 @@ export interface FocusReport {
   };
   steps: FocusStep[];
   issues: FocusIssue[];
+  /** Canonical base64 JPEG data URL emitted by the scanner and fully decoded by the HTML reporter. */
   screenshot: string;
   stoppedBecause: "cycle-complete" | "step-limit" | "tab-press-limit" | "opaque-host-limit" | "no-focusable-elements" | "document-exhausted" | "stalled-on-element";
 }

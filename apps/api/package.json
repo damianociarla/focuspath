@@ -1,7 +1,7 @@
 {
   "name": "@focuspath/api",
   "private": true,
-  "version": "0.6.6",
+  "version": "0.6.7",
   "type": "module",
   "scripts": {
     "build": "tsup src/server.ts --format esm --clean",
@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
+    "jpeg-js": "0.4.4",
     "tsup": "^8.5.0",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
