@@ -42,7 +42,7 @@ aws cloudformation deploy --profile portfolio-bootstrap --region eu-west-1 \
     ExistingGitHubOidcProviderArn=arn:aws:iam::<account-id>:oidc-provider/token.actions.githubusercontent.com
 ```
 
-Configure repository variables `AWS_DEPLOY_ROLE_ARN`, `AWS_CLOUDFORMATION_ROLE_ARN`, `AWS_APPLICATION_ROLE_ARN`, `AWS_ACCOUNT_ID`, and the repository secret `FOCUSPATH_ORIGIN_VERIFY_TOKEN` from the stack outputs and the existing ignored origin-token file. Every AWS deployment job uses the protected `production` GitHub environment, so tag releases and manual recovery emit the same OIDC subject. The trust policy accepts only that environment from `damianociarla/focuspath` and uses GitHub's immutable owner and repository IDs. Override `GitHubOwnerId`, `GitHubRepositoryId`, and `ReleaseEnvironmentName` when reusing this template for another repository.
+Configure repository variables `AWS_DEPLOY_ROLE_ARN`, `AWS_CLOUDFORMATION_ROLE_ARN`, `AWS_APPLICATION_ROLE_ARN`, `AWS_ACCOUNT_ID`, and the repository secret `FOCUSPATH_ORIGIN_VERIFY_TOKEN` from the stack outputs and the existing ignored origin-token file. Normal releases and recovery use the protected `production` environment. Intentional downgrades use the separate `production-rollback` environment, which requires a reviewer and disables administrator bypass. The AWS trust accepts only those two exact environment subjects from `damianociarla/focuspath` and uses GitHub's immutable owner and repository IDs. Override `GitHubOwnerId`, `GitHubRepositoryId`, `ReleaseEnvironmentName`, and `RollbackEnvironmentName` when reusing this template for another repository.
 
 Verify the repository OIDC subject configuration before changing the AWS trust policy:
 
@@ -70,7 +70,14 @@ Every release step is idempotent: an existing immutable ECR tag is reused, an np
 gh workflow run release.yml --repo damianociarla/focuspath --ref main -f tag=v0.6.0
 ```
 
-The AWS deploy job always enters the protected `production` environment and assumes its AWS role before checking whether the API already matches. This deliberately exercises OIDC during both a normal tag release and manual recovery, including the idempotent no-deploy path. The environment deployment policy admits only protected `main` and `v*` refs.
+All tag releases and recovery runs share one non-cancelling concurrency group, so production mutations are serialized. Recovery refuses to deploy a version older than the API currently running. For an intentional rollback, opt in explicitly:
+
+```bash
+gh workflow run release.yml --repo damianociarla/focuspath --ref main \
+  -f tag=v0.6.0 -f allow_downgrade=true
+```
+
+That path pauses at the protected `production-rollback` environment for human approval. The ordinary AWS deploy job remains automated through `production`; both paths assume the AWS role before checking whether the API already matches, deliberately exercising OIDC even on the idempotent no-deploy path. The production deployment policy admits protected `main` and `v*` refs, while rollback admits only `main`.
 
 The script:
 

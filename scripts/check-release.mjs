@@ -17,5 +17,6 @@ assert.equal(apiPackage.version, expectedVersion, "API workspace version is not 
 assert.equal(webPackage.version, expectedVersion, "Web workspace version is not aligned.");
 assert.match(changelog, new RegExp(`^## ${expectedVersion.replaceAll(".", "\\.")}$`, "m"), "Changelog has no entry for this version.");
 assert.match(openapi, new RegExp(`^  version: ${expectedVersion.replaceAll(".", "\\.")}$`, "m"), "OpenAPI version is not aligned.");
+assert.match(openapi, /^servers:\n  - url: https:\/\/d1x165s9roizg5\.cloudfront\.net$/m, "OpenAPI does not expose the hosted beta API server.");
 
 console.log(`Release ${tag} is internally consistent.`);

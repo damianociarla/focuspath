@@ -33,6 +33,12 @@ describe("website accessibility contract", () => {
     assert.match(css, /@media\s*\(forced-colors:\s*active\)/);
   });
 
+  it("reveals the primary hero content promptly while respecting reduced motion", () => {
+    assert.match(css, /\.reveal\{[^}]*animation:enter \.48s/);
+    assert.match(css, /\.reveal:nth-child\(4\)\{animation-delay:\.12s\}/);
+    assert.match(css, /@media\(prefers-reduced-motion:reduce\)/);
+  });
+
   it("states privacy and automated-scan limitations next to the live scanner", () => {
     assert.match(html, /<summary>Privacy and scan limitations<\/summary>/);
     assert.match(html, /does not certify WCAG conformance/);

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.2
+
+- Serialize every production release and recovery run so an older workflow cannot overtake a newer deployment.
+- Refuse API downgrades by default and require an explicit, approval-gated rollback environment for intentional reversions.
+- Restrict grouped Dependabot updates to minor and patch releases so incompatible majors arrive as isolated pull requests.
+- Publish the hosted beta server in OpenAPI and verify that release metadata stays aligned.
+- Reveal the landing-page headline and primary action sooner while preserving reduced-motion behavior.
+
 ## 0.6.1
 
 - Route both tag releases and manual recovery through a protected GitHub environment so every AWS deployment emits the same immutable OIDC subject.
