@@ -55,6 +55,8 @@ npx playwright install chromium
 
 FocusPath exits with code `1` when it finds an error, `2` when the scan itself fails, and `0` otherwise.
 
+URLs without a scheme use HTTPS for public hosts and HTTP for local, loopback, and single-label development hosts. Embedded URL credentials are rejected by both the CLI and TypeScript API. Query strings, page pixels, accessible names, and other rendered content can still contain sensitive data; review and protect generated reports before sharing them.
+
 ## Use as a library
 
 ```ts
@@ -122,7 +124,7 @@ Content-Type: application/json
 
 The default response contains report schema version, engine version, viewport and capture dimensions, traversal metadata, focus stops, findings, network restrictions, and a self-contained `reportHtml` document. Send `{"url":"https://example.com","format":"structured"}` to receive screenshot pixels directly instead of embedded HTML. Schema v4 uses `rect` for final screenshot geometry, `observedRect` for traversal-time geometry and capture metadata to disclose truncated screenshots. The hosted beta scans forward under a 25-second deadline and stricter quotas than the local package. It blocks font and media requests to bound cost, and reports those restrictions because fallback fonts can change layout geometry. DNS validation is preflight-limited, target keys are canonicalized, and Chromium traffic passes through a bounded local proxy that connects only to validated public IPs. Infrastructure egress filtering remains recommended defense in depth for a general-purpose service.
 
-FocusPath does not intentionally persist submitted page content or generated reports. AWS and GitHub may retain request metadata according to their operational logging policies; no application-level report store is configured for the beta.
+FocusPath does not intentionally persist submitted page content or generated reports. AWS and GitHub may retain request metadata according to their operational logging policies; no application-level report store is configured for the beta. Submitted query strings, screenshots, accessible names, and report content may be sensitive, so avoid secret-bearing URLs and review a report before sharing it.
 
 The response contract and error statuses are documented in [OpenAPI 3.1](docs/openapi.yml). Clients must ignore unknown response properties; additive optional fields may appear within `/v1`. See the [compatibility policy](docs/compatibility.md).
 

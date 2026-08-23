@@ -44,7 +44,7 @@
         "description": "An open-source visual accessibility scanner that maps keyboard focus order and creates portable HTML reports.",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Any operating system with a modern web browser",
-        "softwareVersion": "0.6.3",
+        "softwareVersion": "0.6.4",
         "license": "https://opensource.org/license/mit",
         "codeRepository": "https://github.com/damianociarla/focuspath",
         "author": {
@@ -113,7 +113,7 @@
             <p id="scan-terms">Public HTTP(S) pages only. By continuing, you confirm you are authorized to test this page.</p>
             <details class="scan-notes">
               <summary>Privacy and scan limitations</summary>
-              <p>The URL is sent to the FocusPath API on AWS and its page is fetched by Chromium. FocusPath does not intentionally persist page content or reports; infrastructure providers may retain request metadata in operational logs.</p>
+              <p>The URL is sent to the FocusPath API on AWS and its page is fetched by Chromium. FocusPath does not intentionally persist page content or reports; infrastructure providers may retain request metadata in operational logs. Query strings, screenshots, accessible names and report content can be sensitive, so do not submit secret-bearing URLs and review reports before sharing them.</p>
               <p>The hosted beta has a 25-second deadline, one active scanner, request quotas, at most 50 observed stops, 200 Tab presses and 5,000px of beyond-viewport screenshot evidence. Font and media requests are blocked to bound cost; the report names these restrictions because fallback fonts can change geometry. The CLI and library run locally with configurable limits and can scan Shift+Tab separately.</p>
               <p>Cross-origin iframes are opaque; closed shadow roots can only be inferred from repeated focus. FocusPath cannot inspect their internal controls. It does not certify WCAG conformance, compare both directions automatically, or fully cover platform differences and focus-indicator contrast. <a href="./docs.html#security">Read the evidence contract, schema and privacy notes.</a></p>
             </details>

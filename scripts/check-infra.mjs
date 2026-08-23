@@ -74,9 +74,11 @@ assert.match(releaseWorkflow, /concurrency:\n  group: focuspath-production-relea
 assert.match(releaseWorkflow, /deploy-api:[\s\S]*?environment: \$\{\{ github\.event_name == 'workflow_dispatch' && inputs\.allow_downgrade && 'production-rollback' \|\| 'production' \}\}/, "Intentional downgrades must use the approval-gated rollback environment.");
 assert(controlCheckoutIndex > deployIndex && controlCheckoutIndex < credentialsIndex, "The trusted workflow ref must provide the tested SemVer comparator before AWS preflight.");
 assert(credentialsIndex > deployIndex && credentialsIndex < preflightIndex, "Every release recovery must exercise AWS OIDC before the API preflight.");
-assert.match(releaseWorkflow, /ordering="\$\(node scripts\/compare-semver\.mjs "\$\{actual\}" "\$\{expected\}"\)"/, "Release ordering must use the tested SemVer comparator.");
-assert.match(releaseWorkflow, /Refusing to downgrade production from \$\{actual\} to \$\{expected\}/, "Recovery must reject an older API version by default.");
+assert.match(releaseWorkflow, /transition="\$\(node scripts\/classify-release-transition\.mjs "\$\{actual\}" "\$\{expected\}"\)"/, "Release policy must use the tested transition classifier.");
+assert.match(releaseWorkflow, /\"\$\{transition\}\" == \"rollback\" \|\| \"\$\{transition\}\" == \"replacement\"/, "Downgrades and distinct equal-precedence artifacts must require protected recovery.");
+assert.match(releaseWorkflow, /Refusing protected production transition from \$\{actual\} to \$\{expected\}/, "Recovery must reject protected API transitions by default.");
 assert.match(releaseWorkflow, /Approved rollback from \$\{actual\} to \$\{expected\} through the protected rollback environment/, "Approved downgrades must be auditable in release logs.");
+assert.match(releaseWorkflow, /Approved equal-precedence artifact replacement from \$\{actual\} to \$\{expected\} through the protected rollback environment/, "Equal-precedence artifact replacements must be auditable in release logs.");
 assert.match(releaseWorkflow, /FOCUSPATH_APPLICATION_ROLE_ARN: \$\{\{ vars\.AWS_APPLICATION_ROLE_ARN \}\}/, "Deployments must pass the bootstrap application role ARN.");
 assert.match(releaseWorkflow, /env -u GITHUB_REF_NAME node scripts\/check-release\.mjs "\$\{RELEASE_TAG\}"/, "Recovery validation must remove the trigger ref after checking out an existing tag.");
 assert.match(releaseWorkflow, /if npm view "focuspath@\$\{version\}" version >\/dev\/null 2>&1; then/, "npm recovery must distinguish a missing version from registry JSON error output.");

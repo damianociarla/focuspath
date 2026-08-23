@@ -82,13 +82,15 @@ jobs:
             echo "deploy=false" >> "${GITHUB_OUTPUT}"
             echo "API already reports ${expected}; skipping AWS deployment."
           elif [[ -n "${actual}" ]]; then
-            ordering="$(node scripts/compare-semver.mjs "${actual}" "${expected}")"
-            if [[ "${ordering}" == "1" && "${ALLOW_DOWNGRADE}" != "true" ]]; then
-              echo "Refusing to downgrade production from ${actual} to ${expected}. Retry manually with allow_downgrade only for an intentional rollback." >&2
+            transition="$(node scripts/classify-release-transition.mjs "${actual}" "${expected}")"
+            if [[ ( "${transition}" == "rollback" || "${transition}" == "replacement" ) && "${ALLOW_DOWNGRADE}" != "true" ]]; then
+              echo "Refusing protected production transition from ${actual} to ${expected}. Retry manually with allow_downgrade only for an intentional rollback or equal-precedence artifact replacement." >&2
               exit 1
             fi
-            if [[ "${ordering}" == "1" ]]; then
+            if [[ "${transition}" == "rollback" ]]; then
               echo "Approved rollback from ${actual} to ${expected} through the protected rollback environment."
+            elif [[ "${transition}" == "replacement" ]]; then
+              echo "Approved equal-precedence artifact replacement from ${actual} to ${expected} through the protected rollback environment."
             fi
             echo "deploy=true" >> "${GITHUB_OUTPUT}"
           else

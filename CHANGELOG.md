@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.4
+
+- Reject embedded URL credentials in both the CLI and TypeScript scanner, and defensively redact userinfo from legacy report objects.
+- Default schemeless public targets to HTTPS while preserving HTTP for local development hosts.
+- Require protected rollback confirmation when production and the requested release are distinct artifacts with equal SemVer precedence.
+- Keep the primary landing-page actions inside compact mobile viewports and test the 375×667 layout.
+- Document that query strings, screenshots, accessible names, and report content may contain sensitive data.
+
 ## 0.6.3
 
 - Compare release versions with tested SemVer 2.0.0 precedence, including prereleases and build metadata.

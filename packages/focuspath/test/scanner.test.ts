@@ -6,6 +6,12 @@ function page(markup: string): string {
 }
 
 describe("focus scanner", () => {
+  it("rejects embedded URL credentials before launching Chromium", async () => {
+    const scan = scanFocusPath("https://user:secret@example.com");
+    await expect(scan).rejects.toThrow("URLs containing embedded credentials are not supported.");
+    await expect(scan).rejects.not.toThrow(/secret/);
+  });
+
   it("traverses focus in reverse with Shift+Tab", async () => {
     const report = await scanFocusPath(page(`<button>First</button><button>Second</button><button>Third</button>`), {
       direction: "reverse",
