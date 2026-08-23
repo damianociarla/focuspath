@@ -7,6 +7,8 @@ const roleTemplate = await readFile(new URL("infra/aws/github-deploy-role.yml", 
 const applicationTemplate = await readFile(new URL("infra/aws/apprunner.yml", root), "utf8");
 const deployScript = await readFile(new URL("infra/aws/deploy-app-runner.sh", root), "utf8");
 const releaseWorkflow = await readFile(new URL(".github/workflows/release.yml", root), "utf8");
+const ciWorkflow = await readFile(new URL(".github/workflows/ci.yml", root), "utf8");
+const codeqlWorkflow = await readFile(new URL(".github/workflows/codeql.yml", root), "utf8");
 const dependabot = await readFile(new URL(".github/dependabot.yml", root), "utf8");
 
 async function collectYamlFiles(directory, relativeDirectory) {
@@ -54,7 +56,7 @@ assert.match(applicationTemplate, /AppRunnerEcrAccessRoleArn:/, "The application
 assert.match(applicationTemplate, /AccessRoleArn: !Ref AppRunnerEcrAccessRoleArn/, "App Runner must use the bootstrap role ARN.");
 for (const logicalId of ["ApiAutoScaling", "ApiService"]) {
   const resourceStart = applicationTemplate.indexOf(`  ${logicalId}:`);
-  const nextResource = [...applicationTemplate.matchAll(/^  [A-Za-z0-9]+:\n/gm)]
+  const nextResource = [...applicationTemplate.matchAll(/^ {2}[A-Za-z0-9]+:\n/gm)]
     .map((match) => match.index ?? -1)
     .find((index) => index > resourceStart);
   const resource = applicationTemplate.slice(resourceStart, nextResource);
@@ -70,15 +72,16 @@ assert(deployIndex >= 0 && publishIndex > deployIndex, "AWS deployment must prec
 assert.match(releaseWorkflow, /publish-npm:\n\s+needs: deploy-api/, "npm publication must require a healthy API deployment.");
 assert.match(releaseWorkflow, /workflow_dispatch:/, "Release recovery must remain manually invokable.");
 assert.match(releaseWorkflow, /allow_downgrade:[\s\S]*?default: false[\s\S]*?type: boolean/, "Release recovery must require an explicit downgrade choice.");
-assert.match(releaseWorkflow, /concurrency:\n  group: focuspath-production-release\n  cancel-in-progress: false/, "All production releases must share one non-cancelling concurrency group.");
+assert.match(releaseWorkflow, /concurrency:\n {2}group: focuspath-production-release\n {2}cancel-in-progress: false/, "All production releases must share one non-cancelling concurrency group.");
 assert.match(releaseWorkflow, /deploy-api:[\s\S]*?environment: \$\{\{ github\.event_name == 'workflow_dispatch' && inputs\.allow_downgrade && 'production-rollback' \|\| 'production' \}\}/, "Intentional downgrades must use the approval-gated rollback environment.");
 assert(controlCheckoutIndex > deployIndex && controlCheckoutIndex < credentialsIndex, "The trusted workflow ref must provide the tested SemVer comparator before AWS preflight.");
 assert(credentialsIndex > deployIndex && credentialsIndex < preflightIndex, "Every release recovery must exercise AWS OIDC before the API preflight.");
 assert.match(releaseWorkflow, /transition="\$\(node scripts\/classify-release-transition\.mjs "\$\{actual\}" "\$\{expected\}"\)"/, "Release policy must use the tested transition classifier.");
 assert.match(releaseWorkflow, /Parameters\[\?ParameterKey=='ImageIdentifier'\]\.ParameterValue/, "Release recovery must fall back to the deployed CloudFormation image when health is unavailable.");
 assert.match(releaseWorkflow, /node scripts\/extract-image-version\.mjs/, "Release recovery must parse the immutable image tag with the tested helper.");
-assert.match(releaseWorkflow, /Cannot determine the deployed version from either health or CloudFormation\. Refusing recovery outside the protected rollback environment\./, "Unknown recovery state must fail closed outside the rollback environment.");
-assert.match(releaseWorkflow, /\"\$\{transition\}\" == \"rollback\" \|\| \"\$\{transition\}\" == \"replacement\"/, "Downgrades and distinct equal-precedence artifacts must require protected recovery.");
+assert.match(releaseWorkflow, /if \[\[ "\$\{ALLOW_DOWNGRADE\}" != "true" \]\]; then\s+echo "Cannot determine the deployed version from either health or CloudFormation\. Refusing release outside the protected rollback environment\./, "Unknown deployed state must fail closed for both tag releases and manual recovery.");
+assert(!releaseWorkflow.includes('EVENT_NAME: ${{ github.event_name }}'), "Unknown-state policy must not branch on the release trigger.");
+assert.match(releaseWorkflow, /"\$\{transition\}" == "rollback" \|\| "\$\{transition\}" == "replacement"/, "Downgrades and distinct equal-precedence artifacts must require protected recovery.");
 assert.match(releaseWorkflow, /Refusing protected production transition from \$\{actual\} to \$\{expected\}/, "Recovery must reject protected API transitions by default.");
 assert.match(releaseWorkflow, /Approved rollback from \$\{actual\} to \$\{expected\} through the protected rollback environment/, "Approved downgrades must be auditable in release logs.");
 assert.match(releaseWorkflow, /Approved equal-precedence artifact replacement from \$\{actual\} to \$\{expected\} through the protected rollback environment/, "Equal-precedence artifact replacements must be auditable in release logs.");
@@ -87,6 +90,12 @@ assert.match(releaseWorkflow, /env -u GITHUB_REF_NAME node scripts\/check-releas
 assert.match(releaseWorkflow, /if npm view "focuspath@\$\{version\}" version >\/dev\/null 2>&1; then/, "npm recovery must distinguish a missing version from registry JSON error output.");
 assert.match(releaseWorkflow, /publish-npm:[\s\S]*?npx playwright install --with-deps chromium[\s\S]*?npm publish --workspace focuspath/, "The npm publish job must satisfy the package prepublish Playwright tests.");
 assert.match(releaseWorkflow, /focuspath" --version\)" == "\$\{RELEASE_TAG#v\}"/, "The installed release tarball must report the tagged CLI version.");
+for (const [name, workflow] of [["CI", ciWorkflow], ["release validation", releaseWorkflow]]) {
+  assert.match(workflow, /npm run lint/, `${name} must run ESLint.`);
+  assert.match(workflow, /npm audit --audit-level=high/, `${name} must fail on high-severity dependency vulnerabilities.`);
+}
+assert.match(codeqlWorkflow, /github\/codeql-action\/init@[a-f0-9]{40}/, "CodeQL initialization must remain enabled and immutable.");
+assert.match(codeqlWorkflow, /languages: javascript-typescript/, "CodeQL must analyze JavaScript and TypeScript.");
 assert.match(dependabot, /update-types: \[minor, patch\]/, "Grouped Dependabot updates must exclude breaking major releases.");
 assert(deployScript.includes('FOCUSPATH_TAG="${FOCUSPATH_TAG_INPUT//+/_build_}"'), "SemVer build metadata must be normalized into a valid immutable image tag.");
 

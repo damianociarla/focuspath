@@ -42,12 +42,14 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: env -u GITHUB_REF_NAME node scripts/check-release.mjs "${RELEASE_TAG}"
       - run: npm test
+      - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
       - run: npm run dev:check --workspace focuspath
       - run: npm run docs:check
       - run: npm run pack:check --workspace focuspath
       - run: npm run infra:check
+      - run: npm audit --audit-level=high
       - name: Verify installable tarball
         run: |
           package_tarball="$(npm pack --workspace focuspath --json | node -e "let value='';process.stdin.on('data',chunk=>value+=chunk).on('end',()=>console.log(JSON.parse(value)[0].filename))")"
@@ -75,7 +77,6 @@ jobs:
         env:
           API_URL: ${{ vars.VITE_API_URL }}
           ALLOW_DOWNGRADE: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_downgrade || false }}
-          EVENT_NAME: ${{ github.event_name }}
           STACK_NAME: focuspath-api
         run: |
           expected="${RELEASE_TAG#v}"
@@ -102,13 +103,11 @@ jobs:
             fi
             echo "deploy=true" >> "${GITHUB_OUTPUT}"
           else
-            if [[ "${EVENT_NAME}" == "workflow_dispatch" && "${ALLOW_DOWNGRADE}" != "true" ]]; then
-              echo "Cannot determine the deployed version from either health or CloudFormation. Refusing recovery outside the protected rollback environment." >&2
+            if [[ "${ALLOW_DOWNGRADE}" != "true" ]]; then
+              echo "Cannot determine the deployed version from either health or CloudFormation. Refusing release outside the protected rollback environment." >&2
               exit 1
             fi
-            if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
-              echo "Deployment state is unknown; proceeding only because the protected rollback path was explicitly approved."
-            fi
+            echo "Deployment state is unknown; proceeding only because the protected rollback path was explicitly approved."
             echo "deploy=true" >> "${GITHUB_OUTPUT}"
           fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

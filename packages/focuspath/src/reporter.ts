@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import type { FocusReport } from "./types.js";
 
 export function generateHtmlReport(report: FocusReport): string {
@@ -130,15 +131,26 @@ const ISSUE_KINDS = new Set(["missing-name", "missing-or-generic-role", "positiv
 const SEVERITIES = new Set(["error", "warning"]);
 const EVIDENCE_STATUSES = new Set(["plotted", "partially-visible", "outside-capture", "sequence-only"]);
 const EVIDENCE_REASONS = new Set(["scroll-or-clipping-context", "geometry-unavailable"]);
-const MAX_RENDER_COORDINATE = 10_000_000;
+const MAX_RENDER_COORDINATE = 1_000_000;
+const MAX_IMAGE_PIXELS = 160_000_000;
+const MAX_REPORT_STEPS = 10_000;
+const MAX_REPORT_ISSUES = 20_000;
+const MAX_SCROLL_CONTEXTS = 128;
+const MAX_BLOCKED_RESOURCE_TYPES = 256;
+const MAX_SCREENSHOT_BYTES = 50 * 1024 * 1024;
+const MAX_TOTAL_TEXT_LENGTH = 8 * 1024 * 1024;
+const MAX_URL_LENGTH = 16_384;
+const MAX_TEXT_FIELD_LENGTH = 262_144;
+type TextBudget = { used: number };
 
 function assertValidFocusReport(value: unknown): asserts value is FocusReport {
   const report = record(value, "report");
+  const textBudget: TextBudget = { used: 0 };
   enumValue(report.version, REPORT_VERSIONS, "version");
   enumValue(report.direction, DIRECTIONS, "direction");
-  stringValue(report.url, "url");
-  stringValue(report.title, "title");
-  const scannedAt = stringValue(report.scannedAt, "scannedAt");
+  stringValue(report.url, "url", MAX_URL_LENGTH, textBudget);
+  stringValue(report.title, "title", MAX_TEXT_FIELD_LENGTH, textBudget);
+  const scannedAt = stringValue(report.scannedAt, "scannedAt", 128, textBudget);
   if (!Number.isFinite(Date.parse(scannedAt))) invalid("scannedAt must be a valid date.");
   nonNegativeNumber(report.durationMs, "durationMs");
   nonNegativeInteger(report.tabPressCount, "tabPressCount");
@@ -149,39 +161,55 @@ function assertValidFocusReport(value: unknown): asserts value is FocusReport {
   positiveInteger(limits.maxSteps, "limits.maxSteps");
   positiveInteger(limits.maxTabPresses, "limits.maxTabPresses");
   positiveInteger(limits.maxOpaqueTabPresses, "limits.maxOpaqueTabPresses");
+  if ((report.tabPressCount as number) > (limits.maxTabPresses as number)) invalid("tabPressCount exceeds limits.maxTabPresses.");
 
   if (report.capture !== undefined) {
     const capture = record(report.capture, "capture");
-    positiveRenderNumber(capture.sourceWidth, "capture.sourceWidth");
-    positiveRenderNumber(capture.sourceHeight, "capture.sourceHeight");
+    positiveRenderInteger(capture.sourceWidth, "capture.sourceWidth");
+    positiveRenderInteger(capture.sourceHeight, "capture.sourceHeight");
     booleanValue(capture.truncated, "capture.truncated");
+    const document = report.document as { width: number; height: number };
+    if ((capture.sourceWidth as number) < document.width || (capture.sourceHeight as number) < document.height) invalid("capture source dimensions cannot be smaller than captured document pixels.");
+    if ((capture.truncated as boolean) !== ((capture.sourceHeight as number) > document.height)) invalid("capture.truncated must match the source and captured heights.");
   }
   if (report.network !== undefined) {
     const network = record(report.network, "network");
     nonNegativeInteger(network.requestCount, "network.requestCount");
     nonNegativeInteger(network.blockedRequestCount, "network.blockedRequestCount");
-    arrayValue(network.blockedResourceTypes, "network.blockedResourceTypes").forEach((item, index) => stringValue(item, `network.blockedResourceTypes[${index}]`));
+    if ((network.blockedRequestCount as number) > (network.requestCount as number)) invalid("network.blockedRequestCount cannot exceed network.requestCount.");
+    arrayValue(network.blockedResourceTypes, "network.blockedResourceTypes", MAX_BLOCKED_RESOURCE_TYPES).forEach((item, index) => stringValue(item, `network.blockedResourceTypes[${index}]`, 128, textBudget));
   }
 
-  arrayValue(report.steps, "steps").forEach(validateStep);
-  arrayValue(report.issues, "issues").forEach(validateIssue);
-  const screenshot = stringValue(report.screenshot, "screenshot");
-  if (!/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]*={0,2}$/i.test(screenshot)) {
-    invalid("screenshot must be a base64 PNG, JPEG, or WebP data URL.");
-  }
+  const steps = arrayValue(report.steps, "steps", MAX_REPORT_STEPS);
+  if (steps.length > (limits.maxSteps as number)) invalid("steps length exceeds limits.maxSteps.");
+  if ((report.tabPressCount as number) < steps.length) invalid("tabPressCount cannot be smaller than the number of focus steps.");
+  steps.forEach((step, index) => {
+    validateStep(step, index, textBudget);
+    if ((step as Record<string, unknown>).index !== index + 1) invalid(`steps[${index}].index must equal ${index + 1}.`);
+  });
+  const issues = arrayValue(report.issues, "issues", MAX_REPORT_ISSUES);
+  issues.forEach((issue, index) => {
+    validateIssue(issue, index, textBudget);
+    const issueStep = (issue as Record<string, unknown>).step as number;
+    if (issueStep > steps.length) invalid(`issues[${index}].step does not reference an existing focus step.`);
+  });
+  const screenshot = stringValue(report.screenshot, "screenshot", Math.ceil(MAX_SCREENSHOT_BYTES * 4 / 3) + 64);
+  const image = decodeRasterDataUrl(screenshot);
+  const document = report.document as { width: number; height: number };
+  if (image.width !== document.width || image.height !== document.height) invalid("screenshot pixel dimensions must match document dimensions.");
   enumValue(report.stoppedBecause, STOP_REASONS, "stoppedBecause");
 }
 
-function validateStep(value: unknown, index: number): void {
+function validateStep(value: unknown, index: number, textBudget: TextBudget): void {
   const path = `steps[${index}]`;
   const step = record(value, path);
   positiveInteger(step.index, `${path}.index`);
-  stringValue(step.selector, `${path}.selector`);
-  stringValue(step.tagName, `${path}.tagName`);
-  nullableString(step.role, `${path}.role`);
-  stringValue(step.accessibleName, `${path}.accessibleName`);
+  stringValue(step.selector, `${path}.selector`, MAX_TEXT_FIELD_LENGTH, textBudget);
+  stringValue(step.tagName, `${path}.tagName`, 256, textBudget);
+  nullableString(step.role, `${path}.role`, 256, textBudget);
+  stringValue(step.accessibleName, `${path}.accessibleName`, MAX_TEXT_FIELD_LENGTH, textBudget);
   integerValue(step.tabIndex, `${path}.tabIndex`);
-  nullableString(step.href, `${path}.href`);
+  nullableString(step.href, `${path}.href`, MAX_URL_LENGTH, textBudget);
   rect(step.rect, `${path}.rect`);
   if (step.observedRect !== undefined) rect(step.observedRect, `${path}.observedRect`);
   if (step.quad !== undefined) {
@@ -190,31 +218,31 @@ function validateStep(value: unknown, index: number): void {
     quad.forEach((coordinate, coordinateIndex) => renderCoordinate(coordinate, `${path}.quad[${coordinateIndex}]`));
   }
   const indicator = record(step.focusIndicator, `${path}.focusIndicator`);
-  stringValue(indicator.outline, `${path}.focusIndicator.outline`);
-  stringValue(indicator.boxShadow, `${path}.focusIndicator.boxShadow`);
+  stringValue(indicator.outline, `${path}.focusIndicator.outline`, MAX_TEXT_FIELD_LENGTH, textBudget);
+  stringValue(indicator.boxShadow, `${path}.focusIndicator.boxShadow`, MAX_TEXT_FIELD_LENGTH, textBudget);
   if (step.visualEvidence !== undefined) {
     const evidence = record(step.visualEvidence, `${path}.visualEvidence`);
     enumValue(evidence.status, EVIDENCE_STATUSES, `${path}.visualEvidence.status`);
     if (evidence.reason !== undefined) enumValue(evidence.reason, EVIDENCE_REASONS, `${path}.visualEvidence.reason`);
   }
-  if (step.scrollContext !== undefined) validateScrollContext(step.scrollContext, `${path}.scrollContext`);
-  if (step.scrollContexts !== undefined) arrayValue(step.scrollContexts, `${path}.scrollContexts`).forEach((context, contextIndex) => validateScrollContext(context, `${path}.scrollContexts[${contextIndex}]`));
+  if (step.scrollContext !== undefined) validateScrollContext(step.scrollContext, `${path}.scrollContext`, textBudget);
+  if (step.scrollContexts !== undefined) arrayValue(step.scrollContexts, `${path}.scrollContexts`, MAX_SCROLL_CONTEXTS).forEach((context, contextIndex) => validateScrollContext(context, `${path}.scrollContexts[${contextIndex}]`, textBudget));
 }
 
-function validateIssue(value: unknown, index: number): void {
+function validateIssue(value: unknown, index: number, textBudget: TextBudget): void {
   const path = `issues[${index}]`;
   const issue = record(value, path);
   enumValue(issue.kind, ISSUE_KINDS, `${path}.kind`);
   enumValue(issue.severity, SEVERITIES, `${path}.severity`);
   positiveInteger(issue.step, `${path}.step`);
-  stringValue(issue.selector, `${path}.selector`);
-  stringValue(issue.message, `${path}.message`);
+  stringValue(issue.selector, `${path}.selector`, MAX_TEXT_FIELD_LENGTH, textBudget);
+  stringValue(issue.message, `${path}.message`, MAX_TEXT_FIELD_LENGTH, textBudget);
 }
 
-function validateScrollContext(value: unknown, path: string): void {
+function validateScrollContext(value: unknown, path: string, textBudget: TextBudget): void {
   const context = record(value, path);
   if (context.kind !== undefined) enumValue(context.kind, new Set(["element", "viewport"]), `${path}.kind`);
-  stringValue(context.selector, `${path}.selector`);
+  stringValue(context.selector, `${path}.selector`, MAX_TEXT_FIELD_LENGTH, textBudget);
   renderCoordinate(context.scrollLeft, `${path}.scrollLeft`);
   renderCoordinate(context.scrollTop, `${path}.scrollTop`);
 }
@@ -229,8 +257,9 @@ function rect(value: unknown, path: string): void {
 
 function dimensions(value: unknown, path: string): void {
   const size = record(value, path);
-  positiveRenderNumber(size.width, `${path}.width`);
-  positiveRenderNumber(size.height, `${path}.height`);
+  positiveRenderInteger(size.width, `${path}.width`);
+  positiveRenderInteger(size.height, `${path}.height`);
+  if ((size.width as number) * (size.height as number) > MAX_IMAGE_PIXELS) invalid(`${path} exceeds the supported pixel budget.`);
 }
 
 function record(value: unknown, path: string): Record<string, unknown> {
@@ -238,18 +267,25 @@ function record(value: unknown, path: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function arrayValue(value: unknown, path: string): unknown[] {
+function arrayValue(value: unknown, path: string, maximum = Number.POSITIVE_INFINITY): unknown[] {
   if (!Array.isArray(value)) invalid(`${path} must be an array.`);
+  if (value.length > maximum) invalid(`${path} exceeds the supported item budget of ${maximum}.`);
   return value;
 }
 
-function stringValue(value: unknown, path: string): string {
+function stringValue(value: unknown, path: string, maximum = MAX_TEXT_FIELD_LENGTH, budget?: TextBudget): string {
   if (typeof value !== "string") invalid(`${path} must be a string.`);
+  if (value.length > maximum) invalid(`${path} exceeds the supported length of ${maximum}.`);
+  if (budget) {
+    budget.used += value.length;
+    if (budget.used > MAX_TOTAL_TEXT_LENGTH) invalid(`report text exceeds the supported total length of ${MAX_TOTAL_TEXT_LENGTH}.`);
+  }
   return value;
 }
 
-function nullableString(value: unknown, path: string): void {
+function nullableString(value: unknown, path: string, maximum: number, budget: TextBudget): void {
   if (value !== null && typeof value !== "string") invalid(`${path} must be a string or null.`);
+  if (typeof value === "string") stringValue(value, path, maximum, budget);
 }
 
 function booleanValue(value: unknown, path: string): void {
@@ -290,6 +326,87 @@ function nonNegativeRenderNumber(value: unknown, path: string): void {
 function positiveRenderNumber(value: unknown, path: string): void {
   nonNegativeRenderNumber(value, path);
   if ((value as number) === 0) invalid(`${path} must be greater than zero.`);
+}
+
+function positiveRenderInteger(value: unknown, path: string): void {
+  positiveRenderNumber(value, path);
+  if (!Number.isSafeInteger(value)) invalid(`${path} must be a safe integer.`);
+}
+
+function decodeRasterDataUrl(value: string): { width: number; height: number } {
+  const match = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]*={0,2})$/i.exec(value);
+  if (!match || match[2]!.length === 0 || match[2]!.length % 4 !== 0) invalid("screenshot must be a canonical base64 PNG, JPEG, or WebP data URL.");
+  const bytes = Buffer.from(match[2]!, "base64");
+  if (bytes.length === 0 || bytes.length > MAX_SCREENSHOT_BYTES || bytes.toString("base64") !== match[2]) invalid("screenshot base64 is invalid or exceeds the decoded byte budget.");
+  const dimensions = match[1]!.toLowerCase() === "png"
+    ? pngDimensions(bytes)
+    : match[1]!.toLowerCase() === "jpeg"
+      ? jpegDimensions(bytes)
+      : webpDimensions(bytes);
+  if (!dimensions || dimensions.width <= 0 || dimensions.height <= 0 || dimensions.width * dimensions.height > MAX_IMAGE_PIXELS) invalid("screenshot is not a structurally valid raster image within the pixel budget.");
+  return dimensions;
+}
+
+function pngDimensions(bytes: Buffer): { width: number; height: number } | undefined {
+  const signature = "89504e470d0a1a0a";
+  if (bytes.length < 57 || bytes.subarray(0, 8).toString("hex") !== signature) return undefined;
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let sawIdat = false;
+  while (offset + 12 <= bytes.length) {
+    const length = bytes.readUInt32BE(offset);
+    const typeStart = offset + 4;
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + length;
+    const chunkEnd = dataEnd + 4;
+    if (chunkEnd > bytes.length) return undefined;
+    const type = bytes.subarray(typeStart, dataStart).toString("ascii");
+    if (offset === 8) {
+      if (type !== "IHDR" || length !== 13) return undefined;
+      width = bytes.readUInt32BE(dataStart);
+      height = bytes.readUInt32BE(dataStart + 4);
+    }
+    if (type === "IDAT") sawIdat = true;
+    if (type === "IEND") return length === 0 && sawIdat && chunkEnd === bytes.length ? { width, height } : undefined;
+    offset = chunkEnd;
+  }
+  return undefined;
+}
+
+function jpegDimensions(bytes: Buffer): { width: number; height: number } | undefined {
+  if (bytes.length < 12 || bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes.at(-2) !== 0xff || bytes.at(-1) !== 0xd9) return undefined;
+  let offset = 2;
+  let dimensions: { width: number; height: number } | undefined;
+  while (offset + 4 <= bytes.length - 2) {
+    if (bytes[offset] !== 0xff) return undefined;
+    while (bytes[offset] === 0xff) offset += 1;
+    const marker = bytes[offset++]!;
+    if (marker === 0xd9) break;
+    if (marker === 0xda) return dimensions;
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    if (offset + 2 > bytes.length) return undefined;
+    const length = bytes.readUInt16BE(offset);
+    if (length < 2 || offset + length > bytes.length) return undefined;
+    if ((marker >= 0xc0 && marker <= 0xc3) || (marker >= 0xc5 && marker <= 0xc7) || (marker >= 0xc9 && marker <= 0xcb) || (marker >= 0xcd && marker <= 0xcf)) {
+      if (length < 7) return undefined;
+      dimensions = { height: bytes.readUInt16BE(offset + 3), width: bytes.readUInt16BE(offset + 5) };
+    }
+    offset += length;
+  }
+  return dimensions;
+}
+
+function webpDimensions(bytes: Buffer): { width: number; height: number } | undefined {
+  if (bytes.length < 30 || bytes.subarray(0, 4).toString("ascii") !== "RIFF" || bytes.subarray(8, 12).toString("ascii") !== "WEBP" || bytes.readUInt32LE(4) + 8 !== bytes.length) return undefined;
+  const kind = bytes.subarray(12, 16).toString("ascii");
+  if (kind === "VP8X") return { width: 1 + bytes.readUIntLE(24, 3), height: 1 + bytes.readUIntLE(27, 3) };
+  if (kind === "VP8L" && bytes[20] === 0x2f) {
+    const bits = bytes.readUInt32LE(21);
+    return { width: (bits & 0x3fff) + 1, height: ((bits >>> 14) & 0x3fff) + 1 };
+  }
+  if (kind === "VP8 " && bytes.length >= 30 && bytes[23] === 0x9d && bytes[24] === 0x01 && bytes[25] === 0x2a) return { width: bytes.readUInt16LE(26) & 0x3fff, height: bytes.readUInt16LE(28) & 0x3fff };
+  return undefined;
 }
 
 function invalid(message: string): never {

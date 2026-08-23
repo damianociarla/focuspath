@@ -1,7 +1,7 @@
 {
   "name": "focuspath-monorepo",
   "private": true,
-  "version": "0.6.5",
+  "version": "0.6.6",
   "type": "module",
   "workspaces": [
     "apps/*",
@@ -12,11 +12,16 @@
     "dev": "npm run dev --workspace @focuspath/web",
     "dev:api": "npm run dev --workspace @focuspath/api",
     "test": "npm test --workspaces --if-present && node --test scripts/*.test.mjs",
+    "lint": "eslint .",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "docs:check": "npm run docs:check --workspace focuspath",
     "infra:check": "node scripts/check-infra.mjs"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.9.0",
+    "globals": "17.11.0",
+    "typescript-eslint": "8.67.0",
     "yaml": "2.9.0"
   },
   "engines": {
