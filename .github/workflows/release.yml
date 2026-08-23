@@ -88,7 +88,9 @@ jobs:
           FOCUSPATH_ORIGIN_VERIFY_TOKEN: ${{ secrets.FOCUSPATH_ORIGIN_VERIFY_TOKEN }}
           FOCUSPATH_CLOUDFORMATION_ROLE_ARN: ${{ vars.AWS_CLOUDFORMATION_ROLE_ARN }}
           FOCUSPATH_APPLICATION_ROLE_ARN: ${{ vars.AWS_APPLICATION_ROLE_ARN }}
-        run: ./infra/aws/deploy-app-runner.sh
+        run: |
+          : "${FOCUSPATH_APPLICATION_ROLE_ARN:?AWS_APPLICATION_ROLE_ARN is not configured}"
+          ./infra/aws/deploy-app-runner.sh
       - name: Verify deployed engine version
         env:
           API_URL: ${{ vars.VITE_API_URL }}
