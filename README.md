@@ -28,6 +28,9 @@ FocusPath is an early diagnostic tool, not a WCAG conformance test. It currently
 # Default report: ./focuspath-report.html
 npx focuspath https://example.com
 
+# Print the installed CLI version
+npx focuspath --version
+
 # Choose a viewport and maximum number of stops
 npx focuspath localhost:3000 --viewport 390x844 --max-steps 80
 

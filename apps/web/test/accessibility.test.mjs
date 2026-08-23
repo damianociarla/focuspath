@@ -49,6 +49,7 @@ describe("website accessibility contract", () => {
   it("documents traversal budgets, API metadata and opaque boundaries", () => {
     assert.match(docs, /--max-tab-presses/);
     assert.match(docs, /--direction/);
+    assert.match(docs, /-V, --version/);
     assert.match(docs, /direction: "reverse"/);
     assert.match(docs, /report\.tabPressCount/);
     assert.match(docs, /custom element without an open shadow root is only treated as a candidate/);

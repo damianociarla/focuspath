@@ -7,7 +7,13 @@ FOCUSPATH_STACK="${FOCUSPATH_STACK_NAME:-focuspath-api}"
 FOCUSPATH_WAF_STACK="${FOCUSPATH_WAF_STACK_NAME:-focuspath-edge-security}"
 FOCUSPATH_REPOSITORY="${FOCUSPATH_ECR_REPOSITORY:-focuspath-api}"
 FOCUSPATH_ORIGIN="${FOCUSPATH_ALLOWED_ORIGIN:-https://damianociarla.github.io}"
-FOCUSPATH_TAG="${FOCUSPATH_IMAGE_TAG:-$(git rev-parse --short HEAD)-$(date -u +%Y%m%d%H%M%S)}"
+FOCUSPATH_TAG_INPUT="${FOCUSPATH_IMAGE_TAG:-$(git rev-parse --short HEAD)-$(date -u +%Y%m%d%H%M%S)}"
+# SemVer build metadata uses '+', which is not valid in an OCI image tag.
+FOCUSPATH_TAG="${FOCUSPATH_TAG_INPUT//+/_build_}"
+if [[ ! "${FOCUSPATH_TAG}" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+  printf 'Invalid image tag after SemVer normalization: %s\n' "${FOCUSPATH_TAG}" >&2
+  exit 1
+fi
 FOCUSPATH_BUDGET_EMAIL="${FOCUSPATH_BUDGET_ALERT_EMAIL:-}"
 FOCUSPATH_ENABLE_WAF="${FOCUSPATH_ENABLE_WAF:-false}"
 FOCUSPATH_TOKEN_FILE="${FOCUSPATH_ORIGIN_TOKEN_FILE:-infra/aws/.origin-verify-token}"

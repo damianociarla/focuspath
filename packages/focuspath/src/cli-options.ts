@@ -13,6 +13,7 @@ export interface CliOptions {
   viewport: { width: number; height: number };
   headed: boolean;
   help: boolean;
+  version: boolean;
 }
 
 export function parseCliOptions(args: string[]): CliOptions {
@@ -32,10 +33,13 @@ export function parseCliOptions(args: string[]): CliOptions {
       viewport: { type: "string", default: "1440x900" },
       headed: { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
+      version: { type: "boolean", short: "V", default: false },
     },
   });
 
-  if (values.help) return { url: "", output: values.output, maxSteps: 50, maxTabPresses: 200, maxOpaqueTabPresses: 100, maxRequests: 500, maxScreenshotHeight: 20_000, direction: "forward", viewport: { width: 1440, height: 900 }, headed: values.headed, help: true };
+  const informational = { url: "", output: values.output, maxSteps: 50, maxTabPresses: 200, maxOpaqueTabPresses: 100, maxRequests: 500, maxScreenshotHeight: 20_000, direction: "forward" as const, viewport: { width: 1440, height: 900 }, headed: values.headed };
+  if (values.help) return { ...informational, help: true, version: false };
+  if (values.version) return { ...informational, help: false, version: true };
   if (positionals.length === 0) throw new Error("Missing URL. Run focuspath --help for usage.");
   if (positionals.length > 1) throw new Error(`Unexpected argument: ${positionals[1]}`);
 
@@ -65,6 +69,7 @@ export function parseCliOptions(args: string[]): CliOptions {
     viewport: parseViewport(values.viewport),
     headed: values.headed,
     help: false,
+    version: false,
   };
 }
 

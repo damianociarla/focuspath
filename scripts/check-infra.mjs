@@ -5,6 +5,7 @@ import { parseDocument } from "yaml";
 const root = new URL("../", import.meta.url);
 const roleTemplate = await readFile(new URL("infra/aws/github-deploy-role.yml", root), "utf8");
 const applicationTemplate = await readFile(new URL("infra/aws/apprunner.yml", root), "utf8");
+const deployScript = await readFile(new URL("infra/aws/deploy-app-runner.sh", root), "utf8");
 const releaseWorkflow = await readFile(new URL(".github/workflows/release.yml", root), "utf8");
 const dependabot = await readFile(new URL(".github/dependabot.yml", root), "utf8");
 
@@ -62,6 +63,7 @@ for (const logicalId of ["ApiAutoScaling", "ApiService"]) {
 
 const deployIndex = releaseWorkflow.indexOf("  deploy-api:");
 const publishIndex = releaseWorkflow.indexOf("  publish-npm:");
+const controlCheckoutIndex = releaseWorkflow.indexOf("actions/checkout@", deployIndex);
 const credentialsIndex = releaseWorkflow.indexOf("aws-actions/configure-aws-credentials@", deployIndex);
 const preflightIndex = releaseWorkflow.indexOf("Check whether the API already matches", deployIndex);
 assert(deployIndex >= 0 && publishIndex > deployIndex, "AWS deployment must precede npm publication.");
@@ -70,14 +72,18 @@ assert.match(releaseWorkflow, /workflow_dispatch:/, "Release recovery must remai
 assert.match(releaseWorkflow, /allow_downgrade:[\s\S]*?default: false[\s\S]*?type: boolean/, "Release recovery must require an explicit downgrade choice.");
 assert.match(releaseWorkflow, /concurrency:\n  group: focuspath-production-release\n  cancel-in-progress: false/, "All production releases must share one non-cancelling concurrency group.");
 assert.match(releaseWorkflow, /deploy-api:[\s\S]*?environment: \$\{\{ github\.event_name == 'workflow_dispatch' && inputs\.allow_downgrade && 'production-rollback' \|\| 'production' \}\}/, "Intentional downgrades must use the approval-gated rollback environment.");
+assert(controlCheckoutIndex > deployIndex && controlCheckoutIndex < credentialsIndex, "The trusted workflow ref must provide the tested SemVer comparator before AWS preflight.");
 assert(credentialsIndex > deployIndex && credentialsIndex < preflightIndex, "Every release recovery must exercise AWS OIDC before the API preflight.");
+assert.match(releaseWorkflow, /ordering="\$\(node scripts\/compare-semver\.mjs "\$\{actual\}" "\$\{expected\}"\)"/, "Release ordering must use the tested SemVer comparator.");
 assert.match(releaseWorkflow, /Refusing to downgrade production from \$\{actual\} to \$\{expected\}/, "Recovery must reject an older API version by default.");
 assert.match(releaseWorkflow, /Approved rollback from \$\{actual\} to \$\{expected\} through the protected rollback environment/, "Approved downgrades must be auditable in release logs.");
 assert.match(releaseWorkflow, /FOCUSPATH_APPLICATION_ROLE_ARN: \$\{\{ vars\.AWS_APPLICATION_ROLE_ARN \}\}/, "Deployments must pass the bootstrap application role ARN.");
 assert.match(releaseWorkflow, /env -u GITHUB_REF_NAME node scripts\/check-release\.mjs "\$\{RELEASE_TAG\}"/, "Recovery validation must remove the trigger ref after checking out an existing tag.");
 assert.match(releaseWorkflow, /if npm view "focuspath@\$\{version\}" version >\/dev\/null 2>&1; then/, "npm recovery must distinguish a missing version from registry JSON error output.");
 assert.match(releaseWorkflow, /publish-npm:[\s\S]*?npx playwright install --with-deps chromium[\s\S]*?npm publish --workspace focuspath/, "The npm publish job must satisfy the package prepublish Playwright tests.");
+assert.match(releaseWorkflow, /focuspath" --version\)" == "\$\{RELEASE_TAG#v\}"/, "The installed release tarball must report the tagged CLI version.");
 assert.match(dependabot, /update-types: \[minor, patch\]/, "Grouped Dependabot updates must exclude breaking major releases.");
+assert(deployScript.includes('FOCUSPATH_TAG="${FOCUSPATH_TAG_INPUT//+/_build_}"'), "SemVer build metadata must be normalized into a valid immutable image tag.");
 
 for (const [path, workflow] of workflowFiles) {
   for (const match of workflow.matchAll(/^\s*-?\s*uses:\s*([^\s#]+)/gm)) {

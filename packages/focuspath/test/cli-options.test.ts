@@ -19,6 +19,11 @@ describe("CLI options", () => {
     expect(parsed.viewport).toEqual({ width: 390, height: 844 });
   });
 
+  it("supports short and long version flags without requiring a URL", () => {
+    expect(parseCliOptions(["--version"]).version).toBe(true);
+    expect(parseCliOptions(["-V"]).version).toBe(true);
+  });
+
   it("rejects unknown and extra arguments", () => {
     expect(() => parseCliOptions(["--wat", "example.com"])).toThrow(/Unknown option/);
     expect(() => parseCliOptions(["one.example", "two.example"])).toThrow(/Unexpected argument/);
