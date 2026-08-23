@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.7
+
+- Fully decode saved-report JPEG evidence with strict entropy validation and explicit resolution and memory limits before rendering.
+- Restrict portable reports to the JPEG format emitted by the Chromium scanner, rejecting superficially valid PNG or WebP payloads.
+- Require both CI and CodeQL analysis before `main` can be merged.
+
 ## 0.6.6
 
 - Enforce coherent saved-report counters, contiguous step identities, valid issue references, capture metadata and network totals before rendering.

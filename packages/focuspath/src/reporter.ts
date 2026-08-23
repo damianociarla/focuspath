@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import { decode as decodeJpeg } from "jpeg-js";
 import type { FocusReport } from "./types.js";
 
 export function generateHtmlReport(report: FocusReport): string {
@@ -334,79 +335,28 @@ function positiveRenderInteger(value: unknown, path: string): void {
 }
 
 function decodeRasterDataUrl(value: string): { width: number; height: number } {
-  const match = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]*={0,2})$/i.exec(value);
-  if (!match || match[2]!.length === 0 || match[2]!.length % 4 !== 0) invalid("screenshot must be a canonical base64 PNG, JPEG, or WebP data URL.");
-  const bytes = Buffer.from(match[2]!, "base64");
-  if (bytes.length === 0 || bytes.length > MAX_SCREENSHOT_BYTES || bytes.toString("base64") !== match[2]) invalid("screenshot base64 is invalid or exceeds the decoded byte budget.");
-  const dimensions = match[1]!.toLowerCase() === "png"
-    ? pngDimensions(bytes)
-    : match[1]!.toLowerCase() === "jpeg"
-      ? jpegDimensions(bytes)
-      : webpDimensions(bytes);
-  if (!dimensions || dimensions.width <= 0 || dimensions.height <= 0 || dimensions.width * dimensions.height > MAX_IMAGE_PIXELS) invalid("screenshot is not a structurally valid raster image within the pixel budget.");
-  return dimensions;
-}
+  const match = /^data:image\/jpeg;base64,([A-Za-z0-9+/]*={0,2})$/i.exec(value);
+  if (!match || match[1]!.length === 0 || match[1]!.length % 4 !== 0) invalid("screenshot must be the canonical base64 JPEG format emitted by FocusPath.");
+  const bytes = Buffer.from(match[1]!, "base64");
+  if (bytes.length === 0 || bytes.length > MAX_SCREENSHOT_BYTES || bytes.toString("base64") !== match[1]) invalid("screenshot base64 is invalid or exceeds the decoded byte budget.");
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes.at(-2) !== 0xff || bytes.at(-1) !== 0xd9) invalid("screenshot JPEG must have exact start and end markers without trailing data.");
 
-function pngDimensions(bytes: Buffer): { width: number; height: number } | undefined {
-  const signature = "89504e470d0a1a0a";
-  if (bytes.length < 57 || bytes.subarray(0, 8).toString("hex") !== signature) return undefined;
-  let offset = 8;
-  let width = 0;
-  let height = 0;
-  let sawIdat = false;
-  while (offset + 12 <= bytes.length) {
-    const length = bytes.readUInt32BE(offset);
-    const typeStart = offset + 4;
-    const dataStart = offset + 8;
-    const dataEnd = dataStart + length;
-    const chunkEnd = dataEnd + 4;
-    if (chunkEnd > bytes.length) return undefined;
-    const type = bytes.subarray(typeStart, dataStart).toString("ascii");
-    if (offset === 8) {
-      if (type !== "IHDR" || length !== 13) return undefined;
-      width = bytes.readUInt32BE(dataStart);
-      height = bytes.readUInt32BE(dataStart + 4);
+  try {
+    const decoded = decodeJpeg(bytes, {
+      useTArray: true,
+      formatAsRGBA: false,
+      tolerantDecoding: false,
+      maxResolutionInMP: MAX_IMAGE_PIXELS / 1_000_000,
+      maxMemoryUsageInMB: 768,
+    });
+    if (decoded.width <= 0 || decoded.height <= 0 || decoded.width * decoded.height > MAX_IMAGE_PIXELS || decoded.data.byteLength !== decoded.width * decoded.height * 3) {
+      invalid("screenshot JPEG decoded outside the supported pixel budget.");
     }
-    if (type === "IDAT") sawIdat = true;
-    if (type === "IEND") return length === 0 && sawIdat && chunkEnd === bytes.length ? { width, height } : undefined;
-    offset = chunkEnd;
+    return { width: decoded.width, height: decoded.height };
+  } catch (error) {
+    if (error instanceof TypeError && error.message.startsWith("Invalid FocusPath report:")) throw error;
+    invalid("screenshot must be a fully decodable JPEG within the pixel and memory budgets.");
   }
-  return undefined;
-}
-
-function jpegDimensions(bytes: Buffer): { width: number; height: number } | undefined {
-  if (bytes.length < 12 || bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes.at(-2) !== 0xff || bytes.at(-1) !== 0xd9) return undefined;
-  let offset = 2;
-  let dimensions: { width: number; height: number } | undefined;
-  while (offset + 4 <= bytes.length - 2) {
-    if (bytes[offset] !== 0xff) return undefined;
-    while (bytes[offset] === 0xff) offset += 1;
-    const marker = bytes[offset++]!;
-    if (marker === 0xd9) break;
-    if (marker === 0xda) return dimensions;
-    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
-    if (offset + 2 > bytes.length) return undefined;
-    const length = bytes.readUInt16BE(offset);
-    if (length < 2 || offset + length > bytes.length) return undefined;
-    if ((marker >= 0xc0 && marker <= 0xc3) || (marker >= 0xc5 && marker <= 0xc7) || (marker >= 0xc9 && marker <= 0xcb) || (marker >= 0xcd && marker <= 0xcf)) {
-      if (length < 7) return undefined;
-      dimensions = { height: bytes.readUInt16BE(offset + 3), width: bytes.readUInt16BE(offset + 5) };
-    }
-    offset += length;
-  }
-  return dimensions;
-}
-
-function webpDimensions(bytes: Buffer): { width: number; height: number } | undefined {
-  if (bytes.length < 30 || bytes.subarray(0, 4).toString("ascii") !== "RIFF" || bytes.subarray(8, 12).toString("ascii") !== "WEBP" || bytes.readUInt32LE(4) + 8 !== bytes.length) return undefined;
-  const kind = bytes.subarray(12, 16).toString("ascii");
-  if (kind === "VP8X") return { width: 1 + bytes.readUIntLE(24, 3), height: 1 + bytes.readUIntLE(27, 3) };
-  if (kind === "VP8L" && bytes[20] === 0x2f) {
-    const bits = bytes.readUInt32LE(21);
-    return { width: (bits & 0x3fff) + 1, height: ((bits >>> 14) & 0x3fff) + 1 };
-  }
-  if (kind === "VP8 " && bytes.length >= 30 && bytes[23] === 0x9d && bytes[24] === 0x01 && bytes[25] === 0x2a) return { width: bytes.readUInt16LE(26) & 0x3fff, height: bytes.readUInt16LE(28) & 0x3fff };
-  return undefined;
 }
 
 function invalid(message: string): never {
