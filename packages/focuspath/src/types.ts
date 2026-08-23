@@ -94,6 +94,11 @@ export interface FocusReport {
 }
 
 export interface ScanOptions {
+  /**
+   * Allow trusted non-HTTP(S) top-level URLs such as data: or file:.
+   * Disabled by default because passing untrusted URLs could otherwise expose local files or privileged browser schemes.
+   */
+  allowLocalProtocols?: boolean;
   /** Keyboard traversal direction. Reverse uses Shift+Tab. Defaults to forward. */
   direction?: TraversalDirection;
   /** Maximum number of observable focus stops recorded in the report. */
@@ -113,7 +118,10 @@ export interface ScanOptions {
   blockedResourceTypes?: string[];
   /** Maximum document height captured in the embedded screenshot. Defaults to 20,000px; use Infinity explicitly to opt out. */
   maxScreenshotHeight?: number;
-  /** Return false to block a main-frame or subresource URL before the browser requests it. */
+  /**
+   * Return false to block a main-frame or subresource URL before the browser requests it.
+   * This callback does not provide DNS pinning or complete SSRF protection by itself.
+   */
   isUrlAllowed?: (url: string) => boolean | Promise<boolean>;
   /** Optional HTTP proxy used for every Chromium network connection. */
   proxyServer?: string;

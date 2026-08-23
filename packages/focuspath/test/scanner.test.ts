@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { ScanTimeoutError, scanFocusPath } from "../src/scanner.js";
+import { ScanTimeoutError, scanFocusPath as scanFocusPathBase } from "../src/scanner.js";
+import type { ScanOptions } from "../src/types.js";
 
 function page(markup: string): string {
   return `data:text/html;charset=utf-8,${encodeURIComponent(markup)}`;
+}
+
+function scanFocusPath(url: string, options: ScanOptions = {}) {
+  return scanFocusPathBase(url, url.startsWith("data:") ? { ...options, allowLocalProtocols: true } : options);
 }
 
 describe("focus scanner", () => {
@@ -10,6 +15,18 @@ describe("focus scanner", () => {
     const scan = scanFocusPath("https://user:secret@example.com");
     await expect(scan).rejects.toThrow("URLs containing embedded credentials are not supported.");
     await expect(scan).rejects.not.toThrow(/secret/);
+  });
+
+  it("rejects local and non-HTTP protocols unless trusted input explicitly opts in", async () => {
+    await expect(scanFocusPathBase("file:///tmp/focuspath-secret.txt")).rejects.toThrow(/HTTP or HTTPS/);
+    await expect(scanFocusPathBase(page("<button>Local fixture</button>"))).rejects.toThrow(/HTTP or HTTPS/);
+    await expect(scanFocusPathBase("javascript:document.body.innerHTML='<button>Unsafe</button>'", { allowLocalProtocols: true })).rejects.toThrow(/HTTP or HTTPS/);
+
+    const report = await scanFocusPathBase(page("<button>Trusted fixture</button>"), {
+      allowLocalProtocols: true,
+      focusSettleMs: 0,
+    });
+    expect(report.steps[0]?.accessibleName).toBe("Trusted fixture");
   });
 
   it("traverses focus in reverse with Shift+Tab", async () => {

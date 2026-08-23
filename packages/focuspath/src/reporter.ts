@@ -1,6 +1,7 @@
 import type { FocusReport } from "./types.js";
 
 export function generateHtmlReport(report: FocusReport): string {
+  assertValidFocusReport(report);
   const errors = report.issues.filter((issue) => issue.severity === "error").length;
   const warnings = report.issues.filter((issue) => issue.severity === "warning").length;
   const path = report.steps
@@ -120,4 +121,177 @@ function evidencePoint(step: FocusReport["steps"][number], report: FocusReport):
 
 function quadPoints(quad: number[]): string {
   return [0, 2, 4, 6].map((index) => `${quad[index]},${quad[index + 1]}`).join(" ");
+}
+
+const REPORT_VERSIONS = new Set([2, 3, 4]);
+const DIRECTIONS = new Set(["forward", "reverse"]);
+const STOP_REASONS = new Set(["cycle-complete", "step-limit", "tab-press-limit", "opaque-host-limit", "no-focusable-elements", "document-exhausted", "stalled-on-element"]);
+const ISSUE_KINDS = new Set(["missing-name", "missing-or-generic-role", "positive-tabindex", "focus-stalled", "opaque-focus-host", "opaque-host-limit"]);
+const SEVERITIES = new Set(["error", "warning"]);
+const EVIDENCE_STATUSES = new Set(["plotted", "partially-visible", "outside-capture", "sequence-only"]);
+const EVIDENCE_REASONS = new Set(["scroll-or-clipping-context", "geometry-unavailable"]);
+const MAX_RENDER_COORDINATE = 10_000_000;
+
+function assertValidFocusReport(value: unknown): asserts value is FocusReport {
+  const report = record(value, "report");
+  enumValue(report.version, REPORT_VERSIONS, "version");
+  enumValue(report.direction, DIRECTIONS, "direction");
+  stringValue(report.url, "url");
+  stringValue(report.title, "title");
+  const scannedAt = stringValue(report.scannedAt, "scannedAt");
+  if (!Number.isFinite(Date.parse(scannedAt))) invalid("scannedAt must be a valid date.");
+  nonNegativeNumber(report.durationMs, "durationMs");
+  nonNegativeInteger(report.tabPressCount, "tabPressCount");
+  dimensions(report.viewport, "viewport");
+  dimensions(report.document, "document");
+
+  const limits = record(report.limits, "limits");
+  positiveInteger(limits.maxSteps, "limits.maxSteps");
+  positiveInteger(limits.maxTabPresses, "limits.maxTabPresses");
+  positiveInteger(limits.maxOpaqueTabPresses, "limits.maxOpaqueTabPresses");
+
+  if (report.capture !== undefined) {
+    const capture = record(report.capture, "capture");
+    positiveRenderNumber(capture.sourceWidth, "capture.sourceWidth");
+    positiveRenderNumber(capture.sourceHeight, "capture.sourceHeight");
+    booleanValue(capture.truncated, "capture.truncated");
+  }
+  if (report.network !== undefined) {
+    const network = record(report.network, "network");
+    nonNegativeInteger(network.requestCount, "network.requestCount");
+    nonNegativeInteger(network.blockedRequestCount, "network.blockedRequestCount");
+    arrayValue(network.blockedResourceTypes, "network.blockedResourceTypes").forEach((item, index) => stringValue(item, `network.blockedResourceTypes[${index}]`));
+  }
+
+  arrayValue(report.steps, "steps").forEach(validateStep);
+  arrayValue(report.issues, "issues").forEach(validateIssue);
+  const screenshot = stringValue(report.screenshot, "screenshot");
+  if (!/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]*={0,2}$/i.test(screenshot)) {
+    invalid("screenshot must be a base64 PNG, JPEG, or WebP data URL.");
+  }
+  enumValue(report.stoppedBecause, STOP_REASONS, "stoppedBecause");
+}
+
+function validateStep(value: unknown, index: number): void {
+  const path = `steps[${index}]`;
+  const step = record(value, path);
+  positiveInteger(step.index, `${path}.index`);
+  stringValue(step.selector, `${path}.selector`);
+  stringValue(step.tagName, `${path}.tagName`);
+  nullableString(step.role, `${path}.role`);
+  stringValue(step.accessibleName, `${path}.accessibleName`);
+  integerValue(step.tabIndex, `${path}.tabIndex`);
+  nullableString(step.href, `${path}.href`);
+  rect(step.rect, `${path}.rect`);
+  if (step.observedRect !== undefined) rect(step.observedRect, `${path}.observedRect`);
+  if (step.quad !== undefined) {
+    const quad = arrayValue(step.quad, `${path}.quad`);
+    if (quad.length !== 8) invalid(`${path}.quad must contain eight coordinates.`);
+    quad.forEach((coordinate, coordinateIndex) => renderCoordinate(coordinate, `${path}.quad[${coordinateIndex}]`));
+  }
+  const indicator = record(step.focusIndicator, `${path}.focusIndicator`);
+  stringValue(indicator.outline, `${path}.focusIndicator.outline`);
+  stringValue(indicator.boxShadow, `${path}.focusIndicator.boxShadow`);
+  if (step.visualEvidence !== undefined) {
+    const evidence = record(step.visualEvidence, `${path}.visualEvidence`);
+    enumValue(evidence.status, EVIDENCE_STATUSES, `${path}.visualEvidence.status`);
+    if (evidence.reason !== undefined) enumValue(evidence.reason, EVIDENCE_REASONS, `${path}.visualEvidence.reason`);
+  }
+  if (step.scrollContext !== undefined) validateScrollContext(step.scrollContext, `${path}.scrollContext`);
+  if (step.scrollContexts !== undefined) arrayValue(step.scrollContexts, `${path}.scrollContexts`).forEach((context, contextIndex) => validateScrollContext(context, `${path}.scrollContexts[${contextIndex}]`));
+}
+
+function validateIssue(value: unknown, index: number): void {
+  const path = `issues[${index}]`;
+  const issue = record(value, path);
+  enumValue(issue.kind, ISSUE_KINDS, `${path}.kind`);
+  enumValue(issue.severity, SEVERITIES, `${path}.severity`);
+  positiveInteger(issue.step, `${path}.step`);
+  stringValue(issue.selector, `${path}.selector`);
+  stringValue(issue.message, `${path}.message`);
+}
+
+function validateScrollContext(value: unknown, path: string): void {
+  const context = record(value, path);
+  if (context.kind !== undefined) enumValue(context.kind, new Set(["element", "viewport"]), `${path}.kind`);
+  stringValue(context.selector, `${path}.selector`);
+  renderCoordinate(context.scrollLeft, `${path}.scrollLeft`);
+  renderCoordinate(context.scrollTop, `${path}.scrollTop`);
+}
+
+function rect(value: unknown, path: string): void {
+  const box = record(value, path);
+  renderCoordinate(box.x, `${path}.x`);
+  renderCoordinate(box.y, `${path}.y`);
+  nonNegativeRenderNumber(box.width, `${path}.width`);
+  nonNegativeRenderNumber(box.height, `${path}.height`);
+}
+
+function dimensions(value: unknown, path: string): void {
+  const size = record(value, path);
+  positiveRenderNumber(size.width, `${path}.width`);
+  positiveRenderNumber(size.height, `${path}.height`);
+}
+
+function record(value: unknown, path: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) invalid(`${path} must be an object.`);
+  return value as Record<string, unknown>;
+}
+
+function arrayValue(value: unknown, path: string): unknown[] {
+  if (!Array.isArray(value)) invalid(`${path} must be an array.`);
+  return value;
+}
+
+function stringValue(value: unknown, path: string): string {
+  if (typeof value !== "string") invalid(`${path} must be a string.`);
+  return value;
+}
+
+function nullableString(value: unknown, path: string): void {
+  if (value !== null && typeof value !== "string") invalid(`${path} must be a string or null.`);
+}
+
+function booleanValue(value: unknown, path: string): void {
+  if (typeof value !== "boolean") invalid(`${path} must be a boolean.`);
+}
+
+function enumValue(value: unknown, allowed: Set<unknown>, path: string): void {
+  if (!allowed.has(value)) invalid(`${path} has an unsupported value.`);
+}
+
+function integerValue(value: unknown, path: string): void {
+  if (typeof value !== "number" || !Number.isSafeInteger(value)) invalid(`${path} must be a safe integer.`);
+}
+
+function positiveInteger(value: unknown, path: string): void {
+  integerValue(value, path);
+  if ((value as number) <= 0) invalid(`${path} must be greater than zero.`);
+}
+
+function nonNegativeInteger(value: unknown, path: string): void {
+  integerValue(value, path);
+  if ((value as number) < 0) invalid(`${path} must not be negative.`);
+}
+
+function nonNegativeNumber(value: unknown, path: string): void {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) invalid(`${path} must be a finite non-negative number.`);
+}
+
+function renderCoordinate(value: unknown, path: string): void {
+  if (typeof value !== "number" || !Number.isFinite(value) || Math.abs(value) > MAX_RENDER_COORDINATE) invalid(`${path} is outside the supported rendering range.`);
+}
+
+function nonNegativeRenderNumber(value: unknown, path: string): void {
+  renderCoordinate(value, path);
+  if ((value as number) < 0) invalid(`${path} must not be negative.`);
+}
+
+function positiveRenderNumber(value: unknown, path: string): void {
+  nonNegativeRenderNumber(value, path);
+  if ((value as number) === 0) invalid(`${path} must be greater than zero.`);
+}
+
+function invalid(message: string): never {
+  throw new TypeError(`Invalid FocusPath report: ${message}`);
 }

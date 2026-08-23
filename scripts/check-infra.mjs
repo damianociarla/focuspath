@@ -75,6 +75,9 @@ assert.match(releaseWorkflow, /deploy-api:[\s\S]*?environment: \$\{\{ github\.ev
 assert(controlCheckoutIndex > deployIndex && controlCheckoutIndex < credentialsIndex, "The trusted workflow ref must provide the tested SemVer comparator before AWS preflight.");
 assert(credentialsIndex > deployIndex && credentialsIndex < preflightIndex, "Every release recovery must exercise AWS OIDC before the API preflight.");
 assert.match(releaseWorkflow, /transition="\$\(node scripts\/classify-release-transition\.mjs "\$\{actual\}" "\$\{expected\}"\)"/, "Release policy must use the tested transition classifier.");
+assert.match(releaseWorkflow, /Parameters\[\?ParameterKey=='ImageIdentifier'\]\.ParameterValue/, "Release recovery must fall back to the deployed CloudFormation image when health is unavailable.");
+assert.match(releaseWorkflow, /node scripts\/extract-image-version\.mjs/, "Release recovery must parse the immutable image tag with the tested helper.");
+assert.match(releaseWorkflow, /Cannot determine the deployed version from either health or CloudFormation\. Refusing recovery outside the protected rollback environment\./, "Unknown recovery state must fail closed outside the rollback environment.");
 assert.match(releaseWorkflow, /\"\$\{transition\}\" == \"rollback\" \|\| \"\$\{transition\}\" == \"replacement\"/, "Downgrades and distinct equal-precedence artifacts must require protected recovery.");
 assert.match(releaseWorkflow, /Refusing protected production transition from \$\{actual\} to \$\{expected\}/, "Recovery must reject protected API transitions by default.");
 assert.match(releaseWorkflow, /Approved rollback from \$\{actual\} to \$\{expected\} through the protected rollback environment/, "Approved downgrades must be auditable in release logs.");

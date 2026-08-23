@@ -75,12 +75,20 @@ jobs:
         env:
           API_URL: ${{ vars.VITE_API_URL }}
           ALLOW_DOWNGRADE: ${{ github.event_name == 'workflow_dispatch' && inputs.allow_downgrade || false }}
+          EVENT_NAME: ${{ github.event_name }}
+          STACK_NAME: focuspath-api
         run: |
           expected="${RELEASE_TAG#v}"
           actual="$(curl --fail --silent --show-error "${API_URL}/health" | node -e "let body='';process.stdin.on('data',chunk=>body+=chunk).on('end',()=>console.log(JSON.parse(body).version))" || true)"
+          state_source="health endpoint"
+          if [[ -z "${actual}" ]]; then
+            image_identifier="$(aws cloudformation describe-stacks --stack-name "${STACK_NAME}" --query "Stacks[0].Parameters[?ParameterKey=='ImageIdentifier'].ParameterValue | [0]" --output text 2>/dev/null || true)"
+            actual="$(node scripts/extract-image-version.mjs "${image_identifier}" 2>/dev/null || true)"
+            state_source="CloudFormation ImageIdentifier"
+          fi
           if [[ "${actual}" == "${expected}" ]]; then
             echo "deploy=false" >> "${GITHUB_OUTPUT}"
-            echo "API already reports ${expected}; skipping AWS deployment."
+            echo "Current deployment reports ${expected} via ${state_source}; skipping AWS deployment."
           elif [[ -n "${actual}" ]]; then
             transition="$(node scripts/classify-release-transition.mjs "${actual}" "${expected}")"
             if [[ ( "${transition}" == "rollback" || "${transition}" == "replacement" ) && "${ALLOW_DOWNGRADE}" != "true" ]]; then
@@ -94,6 +102,13 @@ jobs:
             fi
             echo "deploy=true" >> "${GITHUB_OUTPUT}"
           else
+            if [[ "${EVENT_NAME}" == "workflow_dispatch" && "${ALLOW_DOWNGRADE}" != "true" ]]; then
+              echo "Cannot determine the deployed version from either health or CloudFormation. Refusing recovery outside the protected rollback environment." >&2
+              exit 1
+            fi
+            if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+              echo "Deployment state is unknown; proceeding only because the protected rollback path was explicitly approved."
+            fi
             echo "deploy=true" >> "${GITHUB_OUTPUT}"
           fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

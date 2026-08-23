@@ -23,7 +23,7 @@ const report: FocusReport = {
 
 describe("scan response formats", () => {
   it("keeps the default portable HTML response without duplicating the screenshot", () => {
-    const response = buildScanResponse(report, "0.6.4", "html");
+    const response = buildScanResponse(report, "0.6.5", "html");
     expect(response).toMatchObject({
       reportVersion: 4,
       responseFormat: "html",
@@ -36,7 +36,7 @@ describe("scan response formats", () => {
   });
 
   it("returns screenshot pixels directly for structured consumers", () => {
-    const response = buildScanResponse(report, "0.6.4", "structured");
+    const response = buildScanResponse(report, "0.6.5", "structured");
     expect(response).toMatchObject({
       reportVersion: 4,
       responseFormat: "structured",

@@ -45,6 +45,7 @@ export class ScanTimeoutError extends Error {
 }
 
 export async function scanFocusPath(url: string, options: ScanOptions = {}): Promise<FocusReport> {
+  assertSupportedTopLevelProtocol(url, options.allowLocalProtocols ?? false);
   assertNoEmbeddedCredentials(url);
   const startedAt = Date.now();
   const maxSteps = positiveInteger(options.maxSteps ?? 50, "maxSteps");
@@ -365,6 +366,18 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
       new Promise<void>((resolve) => setTimeout(resolve, 1_000)),
     ]);
   }
+}
+
+function assertSupportedTopLevelProtocol(value: string, allowLocalProtocols: boolean): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new TypeError("Scan URL must be an absolute HTTP or HTTPS URL.");
+  }
+  if (parsed.protocol === "http:" || parsed.protocol === "https:") return;
+  if (allowLocalProtocols && (parsed.protocol === "data:" || parsed.protocol === "file:")) return;
+  throw new TypeError("Scan URL must use HTTP or HTTPS. Set allowLocalProtocols only for trusted data: or file: input.");
 }
 
 function assertNoEmbeddedCredentials(value: string): void {

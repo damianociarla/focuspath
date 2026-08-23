@@ -174,4 +174,29 @@ describe("reporter", () => {
     expect(html).toContain('<polygon points="10,10 60,14 58,34 8,30"/>');
     expect(html).not.toContain("<rect x=\"10\"");
   });
+
+  it("rejects hostile saved-report values before rendering HTML, CSS, or SVG", () => {
+    const base: FocusReport = {
+      version: 4,
+      direction: "forward",
+      url: "https://example.com/",
+      title: "Saved report",
+      scannedAt: "2026-08-23T00:00:00.000Z",
+      durationMs: 80,
+      tabPressCount: 1,
+      limits: { maxSteps: 50, maxTabPresses: 200, maxOpaqueTabPresses: 100 },
+      viewport: { width: 800, height: 500 },
+      document: { width: 800, height: 500 },
+      screenshot: "data:image/jpeg;base64,test",
+      stoppedBecause: "document-exhausted",
+      steps: [{ index: 1, selector: "button", tagName: "button", role: "button", accessibleName: "Safe", tabIndex: 0, href: null, rect: { x: 20, y: 30, width: 100, height: 40 }, focusIndicator: { outline: "2px solid black", boxShadow: "none" } }],
+      issues: [],
+    };
+
+    expect(() => generateHtmlReport({ ...base, direction: `forward</dd><script>alert(1)</script>` } as unknown as FocusReport)).toThrow(/direction/);
+    expect(() => generateHtmlReport({ ...base, document: { ...base.document, width: `1px}</style><p>forged</p>` } } as unknown as FocusReport)).toThrow(/document\.width/);
+    expect(() => generateHtmlReport({ ...base, issues: [{ kind: "missing-name", severity: `error\"><p>forged</p>`, step: 1, selector: "button", message: "message" }] } as unknown as FocusReport)).toThrow(/severity/);
+    expect(() => generateHtmlReport({ ...base, screenshot: "data:image/svg+xml,<svg onload=alert(1)>" } as unknown as FocusReport)).toThrow(/screenshot/);
+    expect(() => generateHtmlReport({ ...base, steps: [{ ...base.steps[0]!, rect: { ...base.steps[0]!.rect, x: Number.NaN } }] } as FocusReport)).toThrow(/rect\.x/);
+  });
 });
