@@ -20,12 +20,14 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm test
+      - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
       - run: npm run dev:check --workspace focuspath
       - run: npm run docs:check
       - run: npm run pack:check --workspace focuspath
       - run: npm run infra:check
+      - run: npm audit --audit-level=high
       - name: Install actionlint
         env:
           ACTIONLINT_VERSION: 1.7.7

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.6
+
+- Enforce coherent saved-report counters, contiguous step identities, valid issue references, capture metadata and network totals before rendering.
+- Bound saved-report arrays, text, coordinates, pixels and decoded screenshot bytes; verify PNG, JPEG or WebP structure and exact image dimensions.
+- Fail closed when production state is unknown for every release trigger, with an explicit protected rollback as the only override.
+- Add ESLint, dependency audit and CodeQL release gates, and enable repository Dependabot security updates.
+- Keep the landing navigation on one line at 320px and cover the compact header in browser tests.
+
 ## 0.6.5
 
 - Restrict the TypeScript scanner to HTTP(S) by default and require an explicit trusted-input opt-in for local protocols.

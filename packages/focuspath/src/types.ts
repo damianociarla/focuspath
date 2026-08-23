@@ -65,7 +65,7 @@ export interface FocusIssue {
 }
 
 export interface FocusReport {
-  /** scanFocusPath emits v4; v2 and v3 remain accepted by generateHtmlReport for saved-report compatibility. */
+  /** scanFocusPath emits v4; saved v2, v3 and v4 objects are accepted after runtime integrity validation. */
   version: ReportSchemaVersion;
   direction: TraversalDirection;
   url: string;

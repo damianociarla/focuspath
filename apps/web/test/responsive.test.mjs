@@ -58,6 +58,37 @@ describe("documentation responsive layout", () => {
     await page.close();
   });
 
+  it("keeps the header on one line at 320px", async () => {
+    const page = await browser.newPage({ viewport: { width: 320, height: 568 } });
+    await page.goto(`${origin}/index.html`, { waitUntil: "networkidle" });
+    await page.evaluate(() => document.fonts.ready);
+    const layout = await page.evaluate(() => {
+      const wordmark = document.querySelector(".wordmark").getBoundingClientRect();
+      const navigation = document.querySelector(".nav nav").getBoundingClientRect();
+      const links = Array.from(document.querySelectorAll(".nav nav a")).map((link) => ({
+        text: link.textContent.trim(),
+        visible: getComputedStyle(link).display !== "none",
+        whiteSpace: getComputedStyle(link).whiteSpace,
+      }));
+      return {
+        innerWidth: window.innerWidth,
+        bodyWidth: document.body.scrollWidth,
+        documentWidth: document.documentElement.scrollWidth,
+        wordmarkRight: wordmark.right,
+        navigationLeft: navigation.left,
+        navigationRight: navigation.right,
+        links,
+      };
+    });
+    expectNoOverflow(layout.innerWidth, layout.bodyWidth, "body");
+    expectNoOverflow(layout.innerWidth, layout.documentWidth, "document");
+    assert.ok(layout.wordmarkRight <= layout.navigationLeft, "wordmark and navigation must not overlap");
+    assert.ok(layout.navigationRight <= layout.innerWidth, "navigation must stay inside the viewport");
+    assert.deepEqual(layout.links.filter((link) => link.visible).map((link) => link.text), ["Documentation"]);
+    assert.ok(layout.links.filter((link) => link.visible).every((link) => link.whiteSpace === "nowrap"), "visible navigation links must remain on one line");
+    await page.close();
+  });
+
   it("contains long commands inside the 390px production layout", async () => {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
     await page.goto(`${origin}/docs.html`, { waitUntil: "networkidle" });

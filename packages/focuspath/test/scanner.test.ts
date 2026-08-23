@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ScanTimeoutError, scanFocusPath as scanFocusPathBase } from "../src/scanner.js";
+import { generateHtmlReport } from "../src/reporter.js";
 import type { ScanOptions } from "../src/types.js";
 
 function page(markup: string): string {
@@ -27,6 +28,7 @@ describe("focus scanner", () => {
       focusSettleMs: 0,
     });
     expect(report.steps[0]?.accessibleName).toBe("Trusted fixture");
+    expect(generateHtmlReport(report)).toContain("Trusted fixture");
   });
 
   it("traverses focus in reverse with Shift+Tab", async () => {
