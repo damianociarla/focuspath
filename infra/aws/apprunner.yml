@@ -5,6 +5,10 @@ Parameters:
   ImageIdentifier:
     Type: String
     Description: Full private ECR image identifier including tag
+  AppRunnerEcrAccessRoleArn:
+    Type: String
+    AllowedPattern: "arn:[^:]+:iam::[0-9]{12}:role/[A-Za-z0-9+=,.@_/-]+"
+    Description: Immutable App Runner ECR access role ARN managed by the bootstrap stack
   AllowedOrigin:
     Type: String
     Default: https://damianociarla.github.io
@@ -31,36 +35,6 @@ Conditions:
   HasWebAcl: !Not [!Equals [!Ref WebAclArn, ""]]
 
 Resources:
-  AppRunnerEcrAccessRole:
-    Type: AWS::IAM::Role
-    Properties:
-      PermissionsBoundary: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/focuspath-application-role-boundary"
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: build.apprunner.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: FocusPathEcrRead
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action: ecr:GetAuthorizationToken
-                Resource: "*"
-              - Effect: Allow
-                Action:
-                  - ecr:GetDownloadUrlForLayer
-                  - ecr:BatchGetImage
-                  - ecr:DescribeImages
-                  - ecr:BatchCheckLayerAvailability
-                Resource: !Sub "arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/focuspath-api"
-      Tags:
-        - Key: Project
-          Value: FocusPath
-
   ApiAutoScaling:
     Type: AWS::AppRunner::AutoScalingConfiguration
     Properties:
@@ -77,7 +51,7 @@ Resources:
       SourceConfiguration:
         AutoDeploymentsEnabled: false
         AuthenticationConfiguration:
-          AccessRoleArn: !GetAtt AppRunnerEcrAccessRole.Arn
+          AccessRoleArn: !Ref AppRunnerEcrAccessRoleArn
         ImageRepository:
           ImageIdentifier: !Ref ImageIdentifier
           ImageRepositoryType: ECR

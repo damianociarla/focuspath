@@ -42,7 +42,7 @@ aws cloudformation deploy --profile portfolio-bootstrap --region eu-west-1 \
     ExistingGitHubOidcProviderArn=arn:aws:iam::<account-id>:oidc-provider/token.actions.githubusercontent.com
 ```
 
-Configure repository variables `AWS_DEPLOY_ROLE_ARN`, `AWS_CLOUDFORMATION_ROLE_ARN`, `AWS_ACCOUNT_ID`, and the repository secret `FOCUSPATH_ORIGIN_VERIFY_TOKEN` from the stack outputs and the existing ignored origin-token file. The trust policy accepts only version tags from `damianociarla/focuspath` and uses GitHub's immutable owner and repository IDs. Override `GitHubOwnerId` and `GitHubRepositoryId` when reusing this template for another repository.
+Configure repository variables `AWS_DEPLOY_ROLE_ARN`, `AWS_CLOUDFORMATION_ROLE_ARN`, `AWS_APPLICATION_ROLE_ARN`, `AWS_ACCOUNT_ID`, and the repository secret `FOCUSPATH_ORIGIN_VERIFY_TOKEN` from the stack outputs and the existing ignored origin-token file. Every AWS deployment job uses the protected `production` GitHub environment, so tag releases and manual recovery emit the same OIDC subject. The trust policy accepts only that environment from `damianociarla/focuspath` and uses GitHub's immutable owner and repository IDs. Override `GitHubOwnerId`, `GitHubRepositoryId`, and `ReleaseEnvironmentName` when reusing this template for another repository.
 
 Verify the repository OIDC subject configuration before changing the AWS trust policy:
 
@@ -60,7 +60,7 @@ gh api --method PUT repos/damianociarla/focuspath/actions/oidc/customization/sub
 
 To roll back an OIDC customization, first deploy an AWS trust policy that accepts both the current and intended rollback subjects, verify assumption from a tag-bound job, and only then change the GitHub setting. Never change GitHub and AWS trust in the opposite order.
 
-The CloudFormation execution role can manage only the explicit `ApplicationRoleName`, FocusPath App Runner resources, the known CloudFront distribution and origin policy, and the FocusPath budget. The application role uses an ECR-read inline policy plus a managed permission boundary that caps its effective permissions to the same FocusPath repository. The execution role may attach or restore policies only on that exact bounded role, which is required for safe CloudFormation rollback. The default preserves the physical role already owned by the production stack, avoiding an App Runner service replacement. If the application stack is recreated, read the new `AppRunnerEcrAccessRole` physical ID with `aws cloudformation describe-stack-resources` and redeploy the bootstrap stack with `ApplicationRoleName=<physical-id>` before the next application update.
+The bootstrap stack exclusively owns the App Runner ECR access role and its permission boundary. The application stack receives only the immutable role ARN and contains no IAM resources. Its CloudFormation execution role has only `GetRole` and `PassRole` on that exact role: it cannot change trust, attach policies, write inline policies, or remove the boundary. This keeps an application-template compromise from escalating IAM privileges.
 
 ## Release recovery
 
@@ -70,7 +70,7 @@ Every release step is idempotent: an existing immutable ECR tag is reused, an np
 gh workflow run release.yml --repo damianociarla/focuspath --ref main -f tag=v0.6.0
 ```
 
-The AWS deploy job intentionally keeps the tag-based OIDC subject instead of attaching a GitHub environment, because the default environment subject would replace the tag ref in `sub`. Protected `v*` tags and `main` gate who can reach the tag-bound AWS trust.
+The AWS deploy job always enters the protected `production` environment and assumes its AWS role before checking whether the API already matches. This deliberately exercises OIDC during both a normal tag release and manual recovery, including the idempotent no-deploy path. The environment deployment policy admits only protected `main` and `v*` refs.
 
 The script:
 

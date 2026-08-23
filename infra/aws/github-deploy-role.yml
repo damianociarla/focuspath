@@ -24,11 +24,11 @@ Parameters:
     Type: String
     Default: 839342e7-4826-4313-9fb5-0d3b5295bbc5
     Description: Existing FocusPath origin request policy managed by the application stack
-  ApplicationRoleName:
+  ReleaseEnvironmentName:
     Type: String
-    Default: focuspath-api-AppRunnerEcrAccessRole-NEgkxa66ln5j
-    AllowedPattern: "[A-Za-z0-9+=,.@_-]+"
-    Description: Existing App Runner ECR access role managed by the application stack
+    Default: production
+    AllowedPattern: "[A-Za-z0-9._-]+"
+    Description: Protected GitHub environment used by every AWS deployment job
   ExistingGitHubOidcProviderArn:
     Type: String
     Default: ""
@@ -65,6 +65,34 @@ Resources:
               - ecr:BatchCheckLayerAvailability
             Resource: !Sub "arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/focuspath-api"
 
+  AppRunnerEcrAccessRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: focuspath-apprunner-ecr-access
+      PermissionsBoundary: !Ref FocusPathApplicationRoleBoundary
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: build.apprunner.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: FocusPathEcrRead
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                  - ecr:DescribeImages
+                  - ecr:BatchCheckLayerAvailability
+                Resource: !Sub "arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/focuspath-api"
+
   CloudFormationExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -81,31 +109,9 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - iam:CreateRole
-                Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${ApplicationRoleName}"
-                Condition:
-                  StringEquals:
-                    iam:PermissionsBoundary: !Ref FocusPathApplicationRoleBoundary
-              - Effect: Allow
-                Action:
-                  - iam:DeleteRole
                   - iam:GetRole
-                  - iam:GetRolePolicy
-                  - iam:ListRolePolicies
-                  - iam:ListAttachedRolePolicies
-                  - iam:AttachRolePolicy
-                  - iam:DetachRolePolicy
-                  - iam:PutRolePolicy
-                  - iam:DeleteRolePolicy
-                  - iam:UpdateAssumeRolePolicy
-                  - iam:TagRole
-                  - iam:UntagRole
-                  - iam:PutRolePermissionsBoundary
-                  - iam:DeleteRolePermissionsBoundary
-                Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${ApplicationRoleName}"
-              - Effect: Allow
-                Action: iam:PassRole
-                Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${ApplicationRoleName}"
+                  - iam:PassRole
+                Resource: !GetAtt AppRunnerEcrAccessRole.Arn
               - Effect: Allow
                 Action: iam:CreateServiceLinkedRole
                 Resource: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/aws-service-role/apprunner.amazonaws.com/AWSServiceRoleForAppRunner"
@@ -175,8 +181,7 @@ Resources:
             Condition:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
-              StringLike:
-                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubOwner}@${GitHubOwnerId}/${GitHubRepository}@${GitHubRepositoryId}:ref:refs/tags/v*"
+                token.actions.githubusercontent.com:sub: !Sub "repo:${GitHubOwner}@${GitHubOwnerId}/${GitHubRepository}@${GitHubRepositoryId}:environment:${ReleaseEnvironmentName}"
       Policies:
         - PolicyName: FocusPathReleaseDeploy
           PolicyDocument:
@@ -218,3 +223,5 @@ Outputs:
     Value: !GetAtt GitHubDeployRole.Arn
   CloudFormationExecutionRoleArn:
     Value: !GetAtt CloudFormationExecutionRole.Arn
+  ApplicationRoleArn:
+    Value: !GetAtt AppRunnerEcrAccessRole.Arn

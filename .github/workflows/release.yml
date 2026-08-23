@@ -56,7 +56,13 @@ jobs:
       contents: read
       id-token: write
     runs-on: ubuntu-latest
+    environment: production
     steps:
+      - uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: eu-west-1
+          allowed-account-ids: ${{ vars.AWS_ACCOUNT_ID }}
       - name: Check whether the API already matches the release
         id: api-state
         env:
@@ -74,12 +80,6 @@ jobs:
         if: steps.api-state.outputs.deploy == 'true'
         with:
           ref: ${{ env.RELEASE_TAG }}
-      - uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
-        if: steps.api-state.outputs.deploy == 'true'
-        with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: eu-west-1
-          allowed-account-ids: ${{ vars.AWS_ACCOUNT_ID }}
       - name: Deploy or reuse immutable API image
         if: steps.api-state.outputs.deploy == 'true'
         env:
@@ -87,7 +87,10 @@ jobs:
           FOCUSPATH_IMAGE_TAG: ${{ env.RELEASE_TAG }}
           FOCUSPATH_ORIGIN_VERIFY_TOKEN: ${{ secrets.FOCUSPATH_ORIGIN_VERIFY_TOKEN }}
           FOCUSPATH_CLOUDFORMATION_ROLE_ARN: ${{ vars.AWS_CLOUDFORMATION_ROLE_ARN }}
-        run: ./infra/aws/deploy-app-runner.sh
+          FOCUSPATH_APPLICATION_ROLE_ARN: ${{ vars.AWS_APPLICATION_ROLE_ARN }}
+        run: |
+          : "${FOCUSPATH_APPLICATION_ROLE_ARN:?AWS_APPLICATION_ROLE_ARN is not configured}"
+          ./infra/aws/deploy-app-runner.sh
       - name: Verify deployed engine version
         env:
           API_URL: ${{ vars.VITE_API_URL }}
@@ -96,6 +99,7 @@ jobs:
           for attempt in $(seq 1 30); do
             actual="$(curl --fail --silent --show-error "${API_URL}/health" | node -e "let body='';process.stdin.on('data',chunk=>body+=chunk).on('end',()=>console.log(JSON.parse(body).version))" || true)"
             if [[ "${actual}" == "${expected}" ]]; then exit 0; fi
+            echo "Health check attempt ${attempt}/30 reported '${actual:-unavailable}', expected '${expected}'."
             sleep 10
           done
           echo "API did not report expected version ${expected}." >&2

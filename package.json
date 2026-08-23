@@ -16,6 +16,9 @@
     "docs:check": "npm run docs:check --workspace focuspath",
     "infra:check": "node scripts/check-infra.mjs"
   },
+  "devDependencies": {
+    "yaml": "2.9.0"
+  },
   "engines": {
     "node": ">=24"
   },

@@ -13,6 +13,7 @@ FOCUSPATH_ENABLE_WAF="${FOCUSPATH_ENABLE_WAF:-false}"
 FOCUSPATH_TOKEN_FILE="${FOCUSPATH_ORIGIN_TOKEN_FILE:-infra/aws/.origin-verify-token}"
 FOCUSPATH_ORIGIN_TOKEN="${FOCUSPATH_ORIGIN_VERIFY_TOKEN:-}"
 FOCUSPATH_CFN_ROLE="${FOCUSPATH_CLOUDFORMATION_ROLE_ARN:-}"
+FOCUSPATH_APPLICATION_ROLE="${FOCUSPATH_APPLICATION_ROLE_ARN:-}"
 FOCUSPATH_PROFILE_ARGS=()
 if [[ -n "${FOCUSPATH_PROFILE}" ]]; then FOCUSPATH_PROFILE_ARGS=(--profile "${FOCUSPATH_PROFILE}"); fi
 FOCUSPATH_AWS=(aws "${FOCUSPATH_PROFILE_ARGS[@]}" --region "${FOCUSPATH_REGION}")
@@ -20,6 +21,11 @@ FOCUSPATH_AWS_GLOBAL=(aws "${FOCUSPATH_PROFILE_ARGS[@]}" --region us-east-1)
 FOCUSPATH_ACCOUNT="$("${FOCUSPATH_AWS[@]}" sts get-caller-identity --query Account --output text)"
 FOCUSPATH_REGISTRY="${FOCUSPATH_ACCOUNT}.dkr.ecr.${FOCUSPATH_REGION}.amazonaws.com"
 FOCUSPATH_IMAGE="${FOCUSPATH_REGISTRY}/${FOCUSPATH_REPOSITORY}:${FOCUSPATH_TAG}"
+
+if [[ -z "${FOCUSPATH_APPLICATION_ROLE}" ]]; then
+  printf 'FOCUSPATH_APPLICATION_ROLE_ARN is required. Use the ApplicationRoleArn bootstrap stack output.\n' >&2
+  exit 1
+fi
 
 "${FOCUSPATH_AWS[@]}" ecr describe-repositories --repository-names "${FOCUSPATH_REPOSITORY}" >/dev/null 2>&1 \
   || "${FOCUSPATH_AWS[@]}" ecr create-repository --repository-name "${FOCUSPATH_REPOSITORY}" --image-tag-mutability IMMUTABLE --image-scanning-configuration scanOnPush=true >/dev/null
@@ -56,9 +62,8 @@ fi
 "${FOCUSPATH_AWS[@]}" cloudformation deploy \
   --stack-name "${FOCUSPATH_STACK}" \
   --template-file infra/aws/apprunner.yml \
-  --capabilities CAPABILITY_NAMED_IAM \
   "${FOCUSPATH_CFN_ROLE_ARGS[@]}" \
-  --parameter-overrides "ImageIdentifier=${FOCUSPATH_IMAGE}" "AllowedOrigin=${FOCUSPATH_ORIGIN}" "OriginVerifyToken=${FOCUSPATH_ORIGIN_TOKEN}" "BudgetAlertEmail=${FOCUSPATH_BUDGET_EMAIL}" "WebAclArn=${FOCUSPATH_WEB_ACL_ARN}"
+  --parameter-overrides "ImageIdentifier=${FOCUSPATH_IMAGE}" "AppRunnerEcrAccessRoleArn=${FOCUSPATH_APPLICATION_ROLE}" "AllowedOrigin=${FOCUSPATH_ORIGIN}" "OriginVerifyToken=${FOCUSPATH_ORIGIN_TOKEN}" "BudgetAlertEmail=${FOCUSPATH_BUDGET_EMAIL}" "WebAclArn=${FOCUSPATH_WEB_ACL_ARN}"
 
 FOCUSPATH_URL="$("${FOCUSPATH_AWS[@]}" cloudformation describe-stacks --stack-name "${FOCUSPATH_STACK}" --query "Stacks[0].Outputs[?OutputKey=='ProtectedApiUrl'].OutputValue" --output text)"
 FOCUSPATH_DISTRIBUTION="$("${FOCUSPATH_AWS[@]}" cloudformation describe-stacks --stack-name "${FOCUSPATH_STACK}" --query "Stacks[0].Outputs[?OutputKey=='DistributionId'].OutputValue" --output text)"
