@@ -23,7 +23,18 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
-      - run: npm run reporter:memory
+      - name: Check reporter performance against the versioned baseline
+        env:
+          REPORTER_METRICS_PATH: artifacts/reporter-performance.json
+        run: |
+          mkdir -p artifacts
+          npm run reporter:memory
+      - name: Preserve reporter performance history
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: reporter-performance-${{ github.sha }}
+          path: artifacts/reporter-performance.json
+          retention-days: 90
       - run: npm run dev:check --workspace focuspath
       - run: npm run docs:check
       - run: npm run pack:check --workspace focuspath
@@ -43,3 +54,36 @@ jobs:
       - name: Validate GitHub Actions workflows
         run: |
           "${RUNNER_TEMP}/actionlint"
+
+  native-smoke:
+    name: native-smoke (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            os: ubuntu-latest
+          - platform: windows-x64
+            os: windows-latest
+          - platform: macos-arm64
+            os: macos-14
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run reporter:native
+
+  native-compatibility:
+    name: native-compatibility
+    if: ${{ always() }}
+    needs: native-smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every native platform smoke test
+        env:
+          MATRIX_RESULT: ${{ needs.native-smoke.result }}
+        run: test "${MATRIX_RESULT}" = "success"

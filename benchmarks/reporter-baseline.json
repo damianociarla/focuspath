@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "baselineVersion": "0.6.9",
+  "source": {
+    "platform": "GitHub Actions ubuntu-latest/x64",
+    "runId": 32700555551
+  },
+  "fixture": {
+    "width": 1440,
+    "height": 27777
+  },
+  "baseline": {
+    "maxRssMiB": 169.3,
+    "durationMs": 63
+  },
+  "budgets": {
+    "absoluteMaxRssMiB": 384,
+    "maxRssRegressionPercent": 25,
+    "maxDurationRegressionPercent": 100
+  }
+}

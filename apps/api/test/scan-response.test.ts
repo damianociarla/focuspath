@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { encode as encodeJpeg } from "jpeg-js";
 import type { FocusReport } from "focuspath";
 import { buildScanResponse } from "../src/scan-response.js";
+import { assertOpenApiResponse } from "./openapi-validator.js";
 
 function jpegDataUrl(width: number, height: number): string {
   const encoded = encodeJpeg({ data: Buffer.alloc(width * height * 4), width, height }, 50).data;
@@ -31,7 +32,7 @@ const report: FocusReport = {
 
 describe("scan response formats", () => {
   it("keeps the default portable HTML response without duplicating the screenshot", () => {
-    const response = buildScanResponse(report, "0.6.9", "html");
+    const response = buildScanResponse(report, "0.7.0", "html");
     expect(response).toMatchObject({
       reportVersion: 4,
       responseFormat: "html",
@@ -41,15 +42,23 @@ describe("scan response formats", () => {
     });
     expect(response.reportHtml).toContain("report schema v4");
     expect(response).not.toHaveProperty("screenshot");
+    expect(() => assertOpenApiResponse("/v1/scans", "post", 200, response)).not.toThrow();
   });
 
   it("returns screenshot pixels directly for structured consumers", () => {
-    const response = buildScanResponse(report, "0.6.9", "structured");
+    const response = buildScanResponse(report, "0.7.0", "structured");
     expect(response).toMatchObject({
       reportVersion: 4,
       responseFormat: "structured",
       screenshot,
     });
     expect(response).not.toHaveProperty("reportHtml");
+    expect(() => assertOpenApiResponse("/v1/scans", "post", 200, response)).not.toThrow();
+  });
+
+  it("fails when a response drifts from the OpenAPI contract", () => {
+    const response = buildScanResponse(report, "0.7.0", "structured");
+    delete response.capture;
+    expect(() => assertOpenApiResponse("/v1/scans", "post", 200, response)).toThrow(/required.*capture/s);
   });
 });
