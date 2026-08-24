@@ -31,7 +31,7 @@
 
     <main id="documentation" tabindex="-1">
       <section class="docs-hero" aria-labelledby="docs-title">
-        <div><p class="eyebrow">Documentation / v0.6.8</p><h1 id="docs-title">Map the route.<br /><em>Keep the evidence.</em></h1></div>
+        <div><p class="eyebrow">Documentation / v0.6.9</p><h1 id="docs-title">Map the route.<br /><em>Keep the evidence.</em></h1></div>
         <div class="hero-note"><p>FocusPath follows Tab or Shift+Tab navigation in a real Chromium session, records observable focus stops, and produces a portable HTML report.</p><div><a class="action" href="#install">Install</a><a href="https://github.com/damianociarla/focuspath/blob/main/docs/openapi.yml">OpenAPI ↗</a></div></div>
       </section>
 
@@ -47,12 +47,12 @@ npx focuspath https://example.com --output ./focus-report.html
 npx focuspath --version</code></pre>
             <p>Public hostnames without a scheme default to HTTPS; localhost, loopback and local development hostnames default to HTTP. Embedded URL credentials are rejected by both the CLI and TypeScript API.</p>
             <h3>Traversal budgets</h3>
-            <dl class="option-list"><div><dt><code>--direction</code></dt><dd>Use <strong>forward</strong> for Tab or <strong>reverse</strong> for Shift+Tab. Default: <strong>forward</strong>.</dd></div><div><dt><code>--max-steps</code></dt><dd>Maximum observable focus stops. Default: <strong>50</strong>.</dd></div><div><dt><code>--max-tab-presses</code></dt><dd>Total keyboard traversal presses, including movement hidden inside opaque hosts. Default: <strong>200</strong>.</dd></div><div><dt><code>--max-opaque-tab-presses</code></dt><dd>Repeated presses tolerated at one opaque host. Default: <strong>100</strong>.</dd></div><div><dt><code>--max-requests</code></dt><dd>Maximum page requests. Default: <strong>500</strong>.</dd></div><div><dt><code>--max-screenshot-height</code></dt><dd>Maximum screenshot height. Default: <strong>20,000px</strong>.</dd></div><div><dt><code>--unlimited</code></dt><dd>Explicitly removes request and screenshot-height limits. Use only for trusted pages.</dd></div><div><dt><code>-V, --version</code></dt><dd>Prints the installed FocusPath version without starting Chromium.</dd></div></dl>
+            <dl class="option-list"><div><dt><code>--direction</code></dt><dd>Use <strong>forward</strong> for Tab or <strong>reverse</strong> for Shift+Tab. Default: <strong>forward</strong>.</dd></div><div><dt><code>--max-steps</code></dt><dd>Maximum observable focus stops. Default: <strong>50</strong>.</dd></div><div><dt><code>--max-tab-presses</code></dt><dd>Total keyboard traversal presses, including movement hidden inside opaque hosts. Default: <strong>200</strong>.</dd></div><div><dt><code>--max-opaque-tab-presses</code></dt><dd>Repeated presses tolerated at one opaque host. Default: <strong>100</strong>.</dd></div><div><dt><code>--max-requests</code></dt><dd>Maximum page requests. Default: <strong>500</strong>.</dd></div><div><dt><code>--max-screenshot-height</code></dt><dd>Requested screenshot height. Default: <strong>20,000px</strong>; maximum: <strong>100,000px</strong>; the shared 40 MP safety cap still applies.</dd></div><div><dt><code>--unlimited</code></dt><dd>Removes request and requested-height limits for trusted pages; it does not bypass the 40 MP report safety cap.</dd></div><div><dt><code>-V, --version</code></dt><dd>Prints the installed FocusPath version without starting Chromium.</dd></div></dl>
           </section>
 
           <section id="library" aria-labelledby="library-title">
             <p class="section-number">02 / Integrate</p><h2 id="library-title">TypeScript API</h2>
-            <p>The public API is typed and returns both observed stops and the exact limits used by the scan.</p>
+            <p>The ESM-only public API is typed and returns both observed stops and the exact limits used by the scan.</p>
             <pre data-library-example><code>import { scanFocusPath } from "focuspath";
 import { generateHtmlReport } from "focuspath/reporter";
 
@@ -70,7 +70,7 @@ console.log(report.version, report.tabPressCount, report.limits);
 const html = generateHtmlReport(report);</code></pre>
             <p class="callout"><strong>Schema v4:</strong> <code>rect</code> is geometry in the final screenshot state; <code>observedRect</code> preserves traversal-time geometry; <code>capture.truncated</code> reports a screenshot-height cutoff. The reporter still accepts saved v2 and v3 reports. Issue step numbers always reference a step present in <code>report.steps</code>.</p>
             <p><code>scanFocusPath</code> permits only absolute HTTP(S) URLs by default. Non-network schemes such as <code>data:</code> and <code>file:</code> require <code>allowLocalProtocols: true</code>, which is intended only for trusted local input. The <code>isUrlAllowed</code> callback does not provide DNS pinning or complete SSRF protection on its own.</p>
-            <p>Saved reports are validated at runtime before HTML generation. Counters, limits, contiguous step numbers, issue references, capture metadata and network totals must agree. Arrays, text, geometry, decoded image bytes and pixel counts have fixed safety budgets. Screenshot evidence must use the JPEG format emitted by FocusPath, decode completely through native libjpeg-turbo and exactly match the declared captured dimensions; PNG and WebP report inputs are rejected. Report-only consumers can import <code>focuspath/reporter</code> without loading Playwright.</p>
+            <p>Saved reports are validated at runtime before HTML generation. Counters, limits, contiguous step numbers, issue references, capture metadata and network totals must agree. Scanner and reporter share the same 40 MP evidence budget: larger requested or unlimited heights are reduced using the actual capture width, with source dimensions preserved and <code>capture.truncated</code> set. Screenshot evidence must use the JPEG format emitted by FocusPath, decode completely through native libjpeg-turbo and exactly match the declared captured dimensions; PNG and WebP report inputs are rejected. Report-only consumers can import <code>focuspath/reporter</code> without loading Playwright.</p>
           </section>
 
           <section id="traversal" aria-labelledby="traversal-title">
@@ -94,7 +94,7 @@ Content-Type: application/json
 
 // Machine-readable pixels instead of portable reportHtml:
 { "url": "https://example.com", "format": "structured" }</code></pre>
-            <p>Omit <code>format</code> for a self-contained <code>reportHtml</code>. Use <code>structured</code> to receive the screenshot data URL directly without duplicating it inside HTML. FocusPath 0.6.8 emits report schema v4 and reports both source dimensions and screenshot truncation.</p>
+            <p>Omit <code>format</code> for a self-contained <code>reportHtml</code>. Use <code>structured</code> to receive the screenshot data URL directly without duplicating it inside HTML. FocusPath 0.6.9 emits report schema v4 and reports both source dimensions and screenshot truncation.</p>
             <p>The hosted beta blocks font and media requests to bound cost. Every response reports its network restrictions and blocked-request count because fallback fonts can change wrapping and geometry.</p>
             <p>The canonical machine-readable contract is the <a href="https://github.com/damianociarla/focuspath/blob/main/docs/openapi.yml">OpenAPI specification</a>; response evolution follows the <a href="https://github.com/damianociarla/focuspath/blob/main/docs/compatibility.md">compatibility policy</a>. The public edge applies origin checks, request throttling, concurrency control, timeouts and response-size limits; those controls reduce abuse but do not make a browser API private.</p>
           </section>

@@ -10,7 +10,7 @@ const [result] = JSON.parse(output);
 const files = new Set(result.files.map(({ path }) => path));
 const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 
-for (const required of ["LICENSE", "README.md", "dist/index.js", "dist/index.d.ts", "dist/reporter.js", "dist/reporter.d.ts", "dist/cli.js"]) {
+for (const required of ["LICENSE", "README.md", "dist/index.js", "dist/index.d.ts", "dist/reporter.js", "dist/reporter.d.ts", "dist/report-limits.js", "dist/cli.js"]) {
   assert(files.has(required), `npm package is missing ${required}`);
 }
 

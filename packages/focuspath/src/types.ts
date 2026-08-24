@@ -117,7 +117,7 @@ export interface ScanOptions {
   maxRequests?: number;
   /** Browser resource types to block before they are downloaded. */
   blockedResourceTypes?: string[];
-  /** Maximum document height captured in the embedded screenshot. Defaults to 20,000px; use Infinity explicitly to opt out. */
+  /** Maximum requested screenshot height. Defaults to 20,000px; the hard report pixel budget still applies when set to Infinity. */
   maxScreenshotHeight?: number;
   /**
    * Return false to block a main-frame or subresource URL before the browser requests it.

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ScanTimeoutError, scanFocusPath as scanFocusPathBase } from "../src/scanner.js";
 import { generateHtmlReport } from "../src/reporter.js";
+import { MAX_REPORT_PIXELS } from "../src/report-limits.js";
 import type { ScanOptions } from "../src/types.js";
 
 function page(markup: string): string {
@@ -168,6 +169,25 @@ describe("focus scanner", () => {
     await expect(scanFocusPath(page(`<button>Invalid</button>`), { maxRequests: 0 })).rejects.toThrow(/maxRequests/);
     await expect(scanFocusPath(page(`<button>Invalid</button>`), { maxScreenshotHeight: 0 })).rejects.toThrow(/maxScreenshotHeight/);
   });
+
+  it.each([
+    ["a 1440px capture with an explicit 30000px request", { width: 1_440, height: 900 }, 30_000, 30_000, 27_777],
+    ["a 4000px capture above the pixel boundary", { width: 4_000, height: 900 }, 11_000, 11_000, 10_000],
+    ["an unlimited requested height", { width: 1_440, height: 900 }, Number.POSITIVE_INFINITY, 30_000, 27_777],
+  ] as const)("keeps scanner and reporter compatible for %s", async (_name, viewport, maxScreenshotHeight, sourceHeight, expectedHeight) => {
+    const report = await scanFocusPath(page(`<style>html,body{margin:0}.tall{height:${sourceHeight}px;background:linear-gradient(#102030,#dcefff)}</style><button style="position:fixed">First</button><div class="tall"></div>`), {
+      focusSettleMs: 0,
+      maxSteps: 1,
+      maxTabPresses: 1,
+      maxScreenshotHeight,
+      viewport,
+    });
+
+    expect(report.capture).toEqual({ sourceWidth: viewport.width, sourceHeight, truncated: true });
+    expect(report.document).toEqual({ width: viewport.width, height: expectedHeight });
+    expect(report.document.width * report.document.height).toBeLessThanOrEqual(MAX_REPORT_PIXELS);
+    expect(generateHtmlReport(report)).toContain("FocusPath / Report");
+  }, 30_000);
 
   it.each(["forward", "reverse"] as const)("uses transformed iframe quads during %s traversal", async (direction) => {
     const report = await scanFocusPath(page(`<iframe id="frame" title="Transformed" style="width:400px;height:160px;transform:scale(.5) rotate(4deg);transform-origin:0 0" srcdoc='<button id="inside" style="width:100px;height:40px">Inside</button>'></iframe>`), {

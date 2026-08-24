@@ -1,5 +1,6 @@
 import { chromium, errors as playwrightErrors, type Browser, type CDPSession, type Page } from "playwright";
 import { jpegDimensions } from "./jpeg.js";
+import { maxReportHeight } from "./report-limits.js";
 import type { FocusIssue, FocusRect, FocusReport, FocusStep, ScanOptions, VisualEvidence } from "./types.js";
 
 const DEFAULT_VIEWPORT = { width: 1440, height: 900 };
@@ -300,7 +301,7 @@ export async function scanFocusPath(url: string, options: ScanOptions = {}): Pro
         height: Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight ?? 0),
       }));
     const captureWidth = Math.max(1, Math.min(metadata.width, viewport.width));
-    const captureHeight = Math.max(1, Math.min(metadata.height, maxScreenshotHeight));
+    const captureHeight = Math.max(1, Math.min(metadata.height, maxScreenshotHeight, maxReportHeight(captureWidth)));
     const captured = await cdp.send("Page.captureScreenshot", {
       format: "jpeg",
       quality: 78,
