@@ -60,7 +60,8 @@ URLs without a scheme use HTTPS for public hosts and HTTP for local, loopback, a
 ## Use as a library
 
 ```ts
-import { generateHtmlReport, scanFocusPath } from "focuspath";
+import { scanFocusPath } from "focuspath";
+import { generateHtmlReport } from "focuspath/reporter";
 
 const result = await scanFocusPath("http://localhost:3000", {
   viewport: { width: 1440, height: 900 },
@@ -78,7 +79,7 @@ const html = generateHtmlReport(result);
 
 `scanFocusPath` accepts only absolute HTTP(S) URLs by default. Trusted fixtures or local files require the explicit `allowLocalProtocols: true` option; never enable it for user-controlled input. `isUrlAllowed` can block browser requests, but it is not a complete SSRF boundary by itself because it does not pin DNS or constrain egress like the hosted AWS proxy.
 
-`generateHtmlReport` validates saved reports at runtime before rendering them, including schema enums, finite geometry, limits, findings, and screenshot evidence. It accepts only the JPEG format emitted by FocusPath, fully decodes it in strict mode under bounded resolution and memory, and verifies the decoded dimensions. Invalid or tampered JSON throws a `TypeError` instead of producing a report.
+`generateHtmlReport` validates saved reports at runtime before rendering them, including schema enums, finite geometry, limits, findings, and screenshot evidence. It accepts only the JPEG format emitted by FocusPath, fully decodes it with native libjpeg-turbo under fixed byte and pixel budgets, and verifies the decoded dimensions. The dedicated `focuspath/reporter` entry point avoids loading Playwright for report-only consumers; the root export remains available for compatibility. Invalid or tampered JSON throws a `TypeError` instead of producing a report.
 
 ## Development
 

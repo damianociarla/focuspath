@@ -1,4 +1,5 @@
 import { chromium, errors as playwrightErrors, type Browser, type CDPSession, type Page } from "playwright";
+import { jpegDimensions } from "./jpeg.js";
 import type { FocusIssue, FocusRect, FocusReport, FocusStep, ScanOptions, VisualEvidence } from "./types.js";
 
 const DEFAULT_VIEWPORT = { width: 1440, height: 900 };
@@ -390,36 +391,6 @@ function assertNoEmbeddedCredentials(value: string): void {
   if (parsed.username || parsed.password) {
     throw new TypeError("URLs containing embedded credentials are not supported.");
   }
-}
-
-function jpegDimensions(image: Buffer): { width: number; height: number } | null {
-  if (image.length < 4 || image[0] !== 0xff || image[1] !== 0xd8) return null;
-
-  let offset = 2;
-  while (offset + 8 < image.length) {
-    if (image[offset] !== 0xff) {
-      offset += 1;
-      continue;
-    }
-    while (image[offset] === 0xff) offset += 1;
-    const marker = image[offset++];
-    if (marker === undefined || marker === 0xd9 || marker === 0xda) break;
-    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd8)) continue;
-    if (offset + 1 >= image.length) break;
-
-    const segmentLength = image.readUInt16BE(offset);
-    if (segmentLength < 2 || offset + segmentLength > image.length) break;
-    const isStartOfFrame = marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker);
-    if (isStartOfFrame && segmentLength >= 7) {
-      return {
-        width: image.readUInt16BE(offset + 5),
-        height: image.readUInt16BE(offset + 3),
-      };
-    }
-    offset += segmentLength;
-  }
-
-  return null;
 }
 
 function remainingTime(startedAt: number, timeoutMs: number): number {

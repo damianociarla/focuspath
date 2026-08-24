@@ -15,6 +15,21 @@ function jpegDataUrl(width: number, height: number): string {
   return dataUrl;
 }
 
+function truncatedJpegDataUrl(width: number, height: number): string {
+  const encoded = Buffer.from(jpegDataUrl(width, height).split(",")[1]!, "base64");
+  const truncated = Buffer.concat([encoded.subarray(0, Math.floor(encoded.length * 0.75)), Buffer.from([0xff, 0xd9])]);
+  return `data:image/jpeg;base64,${truncated.toString("base64")}`;
+}
+
+function oversizedJpegDataUrl(width: number, height: number): string {
+  const encoded = Buffer.from(jpegDataUrl(8, 8).split(",")[1]!, "base64");
+  const frameOffset = encoded.indexOf(Buffer.from([0xff, 0xc0]));
+  if (frameOffset < 0) throw new Error("JPEG fixture has no baseline frame marker.");
+  encoded.writeUInt16BE(height, frameOffset + 5);
+  encoded.writeUInt16BE(width, frameOffset + 7);
+  return `data:image/jpeg;base64,${encoded.toString("base64")}`;
+}
+
 describe("reporter", () => {
   it("escapes untrusted page content", () => {
     expect(escapeHtml(`<script>alert("x")</script>`)).toBe("&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;");
@@ -262,6 +277,8 @@ describe("reporter", () => {
     expect(() => generateHtmlReport({ ...base, steps: [{ ...base.steps[0]!, selector: "x".repeat(262_145) }] })).toThrow(/supported length/);
     expect(() => generateHtmlReport({ ...base, screenshot: "data:image/png;base64,AAAA" })).toThrow(/JPEG format emitted by FocusPath/);
     expect(() => generateHtmlReport({ ...base, screenshot: "data:image/jpeg;base64,/9j/2Q==" })).toThrow(/fully decodable JPEG/);
+    expect(() => generateHtmlReport({ ...base, screenshot: truncatedJpegDataUrl(800, 500) })).toThrow(/fully decodable JPEG/);
+    expect(() => generateHtmlReport({ ...base, screenshot: oversizedJpegDataUrl(65_535, 65_535) })).toThrow(/pixel budget/);
     expect(() => generateHtmlReport({ ...base, screenshot: jpegDataUrl(799, 500) })).toThrow(/dimensions/);
     expect(() => generateHtmlReport({ ...base, network: { requestCount: 0, blockedRequestCount: 0, blockedResourceTypes: Array.from({ length: 257 }, () => "font") } })).toThrow(/item budget/);
     expect(() => generateHtmlReport({ ...base, steps: [{ ...base.steps[0]!, scrollContexts: Array.from({ length: 129 }, () => ({ kind: "element" as const, selector: "#scroll", scrollLeft: 0, scrollTop: 1 })) }] })).toThrow(/item budget/);

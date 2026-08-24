@@ -1,4 +1,5 @@
-import { generateHtmlReport, scanFocusPath } from "focuspath";
+import { scanFocusPath } from "focuspath";
+import { generateHtmlReport } from "focuspath/reporter";
 
 export async function createFocusPathReport(url: string): Promise<string> {
   const report = await scanFocusPath(url, {

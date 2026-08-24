@@ -1,6 +1,6 @@
 {
   "name": "focuspath",
-  "version": "0.6.7",
+  "version": "0.6.8",
   "description": "See where keyboard navigation breaks. A visual accessibility scanner for focus order.",
   "type": "module",
   "license": "MIT",
@@ -28,6 +28,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./reporter": {
+      "types": "./dist/reporter.d.ts",
+      "import": "./dist/reporter.js"
     }
   },
   "files": [
@@ -36,21 +40,22 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsup src/index.ts src/cli.ts --format esm --dts --clean",
+    "build": "tsup src/index.ts src/cli.ts src/reporter.ts --format esm --dts --clean",
     "dev": "npm run build --silent && node dist/cli.js",
     "dev:check": "node scripts/check-dev.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "docs:check": "tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict test-fixtures/documented-example.ts",
+    "docs:check": "tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --strict test-fixtures/documented-example.ts test-fixtures/reporter-example.ts",
     "prepublishOnly": "npm run build && npm run docs:check && npm test",
     "pack:check": "node scripts/check-package.mjs"
   },
   "dependencies": {
-    "jpeg-js": "0.4.4",
+    "@julusian/jpeg-turbo": "3.0.1",
     "playwright": "^1.55.0"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
+    "jpeg-js": "0.4.4",
     "tsup": "^8.5.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
