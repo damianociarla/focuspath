@@ -1,8 +1,10 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import type { Server } from "node:http";
 import { fileURLToPath } from "node:url";
 import { createServer } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { assertOpenApiResponse } from "./openapi-validator.js";
+import { createFocusPathServer } from "../src/server.js";
 
 let api: ChildProcess;
 let baseUrl: string;
@@ -21,7 +23,7 @@ describe("HTTP API", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
     const body = await response.json();
-    expect(body).toEqual({ status: "ok", version: "0.7.1", activeScans: 0 });
+    expect(body).toEqual({ status: "ok", version: "0.7.2", activeScans: 0 });
     expect(() => assertOpenApiResponse("/health", "get", response.status, body, response.headers)).not.toThrow();
   });
 
@@ -192,15 +194,35 @@ describe("HTTP API", () => {
     }
   });
 
-  it("validates the documented scan failure response", () => {
-    const headers = new Headers({ "content-type": "application/json" });
-    expect(() => assertOpenApiResponse(
-      "/v1/scans",
-      "post",
-      502,
-      { error: "The page could not be scanned. It may block automated browsers or take too long to load." },
-      headers,
-    )).not.toThrow();
+  it("maps an injected scanner failure to a real HTTP 502 response", async () => {
+    const unexpectedErrors: unknown[] = [];
+    const server = createFocusPathServer({
+      engineVersion: "0.7.2",
+      env: {
+        ...process.env,
+        ORIGIN_VERIFY_TOKEN: "",
+        ALLOWED_ORIGINS: "http://127.0.0.1:5173",
+        RATE_LIMIT_PER_10_MINUTES: "10",
+        GLOBAL_RATE_LIMIT_PER_HOUR: "10",
+        TARGET_RATE_LIMIT_PER_HOUR: "10",
+      },
+      resolveSubmittedUrl: async (value) => new URL(value),
+      scan: async () => { throw new Error("forced scanner failure"); },
+      logUnexpectedError: (error) => unexpectedErrors.push(error),
+    });
+    const isolatedUrl = await listenApi(server);
+    try {
+      const response = await postScan(isolatedUrl, "https://example.com");
+      const body = await response.json();
+      expect(response.status).toBe(502);
+      expect(body).toEqual({ error: "The page could not be scanned. It may block automated browsers or take too long to load." });
+      expect(() => assertOpenApiResponse("/v1/scans", "post", response.status, body, response.headers)).not.toThrow();
+      expect(unexpectedErrors).toHaveLength(1);
+      const health = await fetch(`${isolatedUrl}/health`).then((healthResponse) => healthResponse.json()) as { activeScans: number };
+      expect(health.activeScans).toBe(0);
+    } finally {
+      await closeServer(server);
+    }
   });
 
   it("requires documented retry headers", () => {
@@ -220,6 +242,23 @@ async function postScan(url: string, target: string, headers: Record<string, str
     headers: { "content-type": "application/json", ...headers },
     body: JSON.stringify({ url: target }),
   });
+}
+
+async function listenApi(server: Server): Promise<string> {
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("Could not allocate injected API test port");
+  return `http://127.0.0.1:${address.port}`;
+}
+
+async function closeServer(server: Server): Promise<void> {
+  await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
 }
 
 async function startApi(env: Record<string, string> = {}): Promise<{ process: ChildProcess; baseUrl: string }> {

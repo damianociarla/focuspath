@@ -12,6 +12,9 @@
     <link rel="icon" href="%BASE_URL%favicon.svg" type="image/svg+xml" sizes="any" />
     <link rel="icon" href="%BASE_URL%favicon-32.png" type="image/png" sizes="32x32" />
     <link rel="apple-touch-icon" href="%BASE_URL%apple-touch-icon.png" sizes="180x180" />
+    <link rel="preload" href="%BASE_URL%fonts/manrope-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="%BASE_URL%fonts/dm-mono-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="%BASE_URL%fonts/dm-mono-latin-500-normal.woff2" as="font" type="font/woff2" crossorigin />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="FocusPath" />
     <meta property="og:url" content="https://damianociarla.github.io/focuspath/docs.html" />
@@ -31,7 +34,7 @@
 
     <main id="documentation" tabindex="-1">
       <section class="docs-hero" aria-labelledby="docs-title">
-        <div><p class="eyebrow">Documentation / v0.7.1</p><h1 id="docs-title">Map the route.<br /><em>Keep the evidence.</em></h1></div>
+        <div><p class="eyebrow">Documentation / v0.7.2</p><h1 id="docs-title">Map the route.<br /><em>Keep the evidence.</em></h1></div>
         <div class="hero-note"><p>FocusPath follows Tab or Shift+Tab navigation in a real Chromium session, records observable focus stops, and produces a portable HTML report.</p><div><a class="action" href="#install">Install</a><a href="https://github.com/damianociarla/focuspath/blob/main/docs/openapi.yml">OpenAPI ↗</a></div></div>
       </section>
 
@@ -94,7 +97,7 @@ Content-Type: application/json
 
 // Machine-readable pixels instead of portable reportHtml:
 { "url": "https://example.com", "format": "structured" }</code></pre>
-            <p>Omit <code>format</code> for a self-contained <code>reportHtml</code>. Use <code>structured</code> to receive the screenshot data URL directly without duplicating it inside HTML. FocusPath 0.7.1 emits report schema v4 and reports both source dimensions and screenshot truncation.</p>
+            <p>Omit <code>format</code> for a self-contained <code>reportHtml</code>. Use <code>structured</code> to receive the screenshot data URL directly without duplicating it inside HTML. FocusPath 0.7.2 emits report schema v4 and reports both source dimensions and screenshot truncation.</p>
             <p>The hosted beta blocks font and media requests to bound cost. Every response reports its network restrictions and blocked-request count because fallback fonts can change wrapping and geometry.</p>
             <p>The canonical machine-readable contract is the <a href="https://github.com/damianociarla/focuspath/blob/main/docs/openapi.yml">OpenAPI specification</a>; deterministic HTTP responses and both successful scan formats are validated against it in CI. Response evolution follows the <a href="https://github.com/damianociarla/focuspath/blob/main/docs/compatibility.md">compatibility policy</a>. The public edge applies origin checks, request throttling, concurrency control, timeouts and response-size limits; those controls reduce abuse but do not make a browser API private.</p>
           </section>

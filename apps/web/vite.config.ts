@@ -8,6 +8,11 @@ export default defineConfig({
         main: new URL("./index.html", import.meta.url).pathname,
         docs: new URL("./docs.html", import.meta.url).pathname,
       },
+      output: {
+        assetFileNames: (assetInfo) => assetInfo.name?.endsWith(".woff2")
+          ? "fonts/[name][extname]"
+          : "assets/[name]-[hash][extname]",
+      },
     },
   },
 });

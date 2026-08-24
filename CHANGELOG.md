@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.2
+
+- Make the hosted scanner dependency injectable and verify an unexpected scanner failure through a real HTTP request, including the 502 body, OpenAPI contract and released capacity slot.
+- Self-host the exact Manrope and DM Mono WOFF2 variants used by the site, with OFL licenses, stable production paths and preload hints.
+- Exercise the bundled fonts in Chromium and fail the website tests on any third-party font request.
+
 ## 0.7.1
 
 - Validate every documented API error shape against OpenAPI, including retry response headers and the 502 scan-failure contract.

@@ -7,6 +7,7 @@ const html = await readFile(new URL("index.html", root), "utf8");
 const css = await readFile(new URL("src/styles.css", root), "utf8");
 const docs = await readFile(new URL("docs.html", root), "utf8");
 const docsCss = await readFile(new URL("src/docs.css", root), "utf8");
+const fontsCss = await readFile(new URL("src/fonts.css", root), "utf8");
 const documentedExample = await readFile(new URL("../../packages/focuspath/test-fixtures/documented-example.ts", root), "utf8");
 
 describe("website accessibility contract", () => {
@@ -37,6 +38,20 @@ describe("website accessibility contract", () => {
     assert.match(css, /\.reveal\{[^}]*animation:enter \.48s/);
     assert.match(css, /\.reveal:nth-child\(4\)\{animation-delay:\.12s\}/);
     assert.match(css, /@media\(prefers-reduced-motion:reduce\)/);
+  });
+
+  it("self-hosts and preloads only the font variants used by the interface", () => {
+    for (const source of [html, docs, css, docsCss, fontsCss]) {
+      assert.doesNotMatch(source, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
+    }
+    assert.match(fontsCss, /manrope-latin-wght-normal\.woff2/);
+    assert.match(fontsCss, /dm-mono-latin-400-normal\.woff2/);
+    assert.match(fontsCss, /dm-mono-latin-500-normal\.woff2/);
+    assert.match(fontsCss, /font-display:\s*swap/);
+    for (const font of ["manrope-latin-wght-normal", "dm-mono-latin-400-normal", "dm-mono-latin-500-normal"]) {
+      assert.match(html, new RegExp(`rel="preload"[^>]+${font}\\.woff2`));
+      assert.match(docs, new RegExp(`rel="preload"[^>]+${font}\\.woff2`));
+    }
   });
 
   it("states privacy and automated-scan limitations next to the live scanner", () => {
