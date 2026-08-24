@@ -1,7 +1,7 @@
 {
   "name": "focuspath-monorepo",
   "private": true,
-  "version": "0.6.9",
+  "version": "0.7.0",
   "type": "module",
   "workspaces": [
     "apps/*",
@@ -16,10 +16,13 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "docs:check": "npm run docs:check --workspace focuspath",
     "reporter:memory": "npm run build --workspace focuspath && node scripts/check-reporter-memory.mjs",
+    "reporter:native": "npm run build --workspace focuspath && node scripts/check-native-reporter.mjs",
     "infra:check": "node scripts/check-infra.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
     "eslint": "10.9.0",
     "globals": "17.11.0",
     "typescript-eslint": "8.67.0",

@@ -94,6 +94,13 @@ for (const [name, workflow] of [["CI", ciWorkflow], ["release validation", relea
   assert.match(workflow, /npm run lint/, `${name} must run ESLint.`);
   assert.match(workflow, /npm audit --audit-level=high/, `${name} must fail on high-severity dependency vulnerabilities.`);
 }
+for (const runner of ["ubuntu-latest", "windows-latest", "macos-14"]) {
+  assert(ciWorkflow.includes(`os: ${runner}`), `Native compatibility CI must cover ${runner}.`);
+}
+assert.match(ciWorkflow, /native-smoke:[\s\S]*?npm run reporter:native/, "CI must exercise the native JPEG reporter on every matrix platform.");
+assert.match(ciWorkflow, /native-compatibility:[\s\S]*?needs: native-smoke/, "CI must expose one stable native compatibility check for branch protection.");
+assert.match(ciWorkflow, /actions\/upload-artifact@[a-f0-9]{40}[\s\S]*?reporter-performance-\$\{\{ github\.sha \}\}/, "CI must preserve per-commit reporter performance measurements.");
+assert.match(ciWorkflow, /REPORTER_METRICS_PATH: artifacts\/reporter-performance\.json/, "CI must emit structured reporter performance history.");
 assert.match(codeqlWorkflow, /github\/codeql-action\/init@[a-f0-9]{40}/, "CodeQL initialization must remain enabled and immutable.");
 assert.match(codeqlWorkflow, /languages: javascript-typescript/, "CodeQL must analyze JavaScript and TypeScript.");
 assert.match(dependabot, /update-types: \[minor, patch\]/, "Grouped Dependabot updates must exclude breaking major releases.");

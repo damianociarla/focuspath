@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createServer } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { assertOpenApiResponse } from "./openapi-validator.js";
 
 let api: ChildProcess;
 let baseUrl: string;
@@ -19,13 +20,17 @@ describe("HTTP API", () => {
     const response = await fetch(`${baseUrl}/health`);
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(await response.json()).toEqual({ status: "ok", version: "0.6.9", activeScans: 0 });
+    const body = await response.json();
+    expect(body).toEqual({ status: "ok", version: "0.7.0", activeScans: 0 });
+    expect(() => assertOpenApiResponse("/health", "get", response.status, body)).not.toThrow();
   });
 
   it("enforces JSON content type", async () => {
     const response = await fetch(`${baseUrl}/v1/scans`, { method: "POST", body: "url=https://example.com" });
     expect(response.status).toBe(415);
-    expect(await response.json()).toEqual({ error: "Content-Type must be application/json." });
+    const body = await response.json();
+    expect(body).toEqual({ error: "Content-Type must be application/json." });
+    expect(() => assertOpenApiResponse("/v1/scans", "post", response.status, body)).not.toThrow();
   });
 
   it("rejects malformed and unexpected request bodies", async () => {

@@ -87,7 +87,7 @@ Scanner and reporter share a hard 40-megapixel evidence budget. A larger `maxScr
 
 ## Development
 
-Requirements: Node.js 24+. This is an intentional project baseline so the CLI, CI, Playwright container, and release workflow use the same runtime; broader compatibility can be considered once it has its own tested matrix.
+Requirements: Node.js 24+. This is an intentional project baseline so the CLI, CI, Playwright container, and release workflow use the same runtime. Native report generation is smoke-tested on Linux x64, Windows x64 and macOS ARM64.
 
 ```bash
 npm install
@@ -135,7 +135,7 @@ The default response contains report schema version, engine version, viewport an
 
 FocusPath does not intentionally persist submitted page content or generated reports. AWS and GitHub may retain request metadata according to their operational logging policies; no application-level report store is configured for the beta. Submitted query strings, screenshots, accessible names, and report content may be sensitive, so avoid secret-bearing URLs and review a report before sharing it.
 
-The response contract and error statuses are documented in [OpenAPI 3.1](docs/openapi.yml). Clients must ignore unknown response properties; additive optional fields may appear within `/v1`. See the [compatibility policy](docs/compatibility.md).
+The response contract and error statuses are documented in [OpenAPI 3.1](docs/openapi.yml). Deterministic HTTP responses and both successful scan formats are validated against that contract in CI. Clients must ignore unknown response properties; additive optional fields may appear within `/v1`. See the [compatibility policy](docs/compatibility.md).
 
 ## Roadmap
 

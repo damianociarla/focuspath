@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0
+
+- Validate deterministic HTTP responses and both hosted scan response formats against the canonical OpenAPI 3.1 contract in CI.
+- Exercise native JPEG report generation on Linux x64, Windows x64 and macOS ARM64 with one stable compatibility gate.
+- Compare the near-limit reporter benchmark with a versioned 0.6.9 baseline, enforce relative and absolute regression budgets, and retain structured per-commit measurements for 90 days.
+
 ## 0.6.9
 
 - Share one 40-megapixel safety budget between Chromium capture and report rendering so every scanner result remains renderable.

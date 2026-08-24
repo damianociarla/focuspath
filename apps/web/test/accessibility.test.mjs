@@ -55,6 +55,7 @@ describe("website accessibility contract", () => {
     assert.match(docs, /report\.tabPressCount/);
     assert.match(docs, /custom element without an open shadow root is only treated as a candidate/);
     assert.match(docs, /OpenAPI specification/);
+    assert.match(docs, /successful scan formats are validated against it in CI/);
     assert.match(docs, /blocks font and media requests/);
     assert.match(docs, /Embedded URL credentials are rejected/);
     assert.match(docs, /Query strings, screenshots, accessible names and rendered report content may contain sensitive data/);
