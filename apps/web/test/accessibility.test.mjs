@@ -58,10 +58,12 @@ describe("website accessibility contract", () => {
     assert.match(docs, /blocks font and media requests/);
     assert.match(docs, /Embedded URL credentials are rejected/);
     assert.match(docs, /Query strings, screenshots, accessible names and rendered report content may contain sensitive data/);
-    assert.match(docs, /import \{ scanFocusPath, generateHtmlReport \} from "focuspath"/);
+    assert.match(docs, /import \{ scanFocusPath \} from "focuspath"/);
+    assert.match(docs, /import \{ generateHtmlReport \} from "focuspath\/reporter"/);
     assert.match(docs, /const html = generateHtmlReport\(report\)/);
     assert.doesNotMatch(docs, /renderHtmlReport/);
-    assert.match(documentedExample, /import \{ generateHtmlReport, scanFocusPath \} from "focuspath"/);
+    assert.match(documentedExample, /import \{ scanFocusPath \} from "focuspath"/);
+    assert.match(documentedExample, /import \{ generateHtmlReport \} from "focuspath\/reporter"/);
     assert.match(documentedExample, /return generateHtmlReport\(report\)/);
     assert.match(documentedExample, /direction: "reverse"/);
   });

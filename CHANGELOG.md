@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.8
+
+- Replace the full-frame JavaScript JPEG decoder with synchronous native libjpeg-turbo validation, reducing a 1440×20,000 report from roughly 794 MiB to about 133 MiB peak RSS locally while rejecting truncated entropy streams.
+- Gate CI and releases on a real 1440×20,000 Chromium screenshot staying below a conservative 384 MiB reporter budget.
+- Add the `focuspath/reporter` entry point so report-only consumers do not load Playwright, while preserving the root export for compatibility.
+- Reduce the untrusted saved-report pixel ceiling to 40 megapixels without changing the scanner's default 20,000px screenshot height.
+
 ## 0.6.7
 
 - Fully decode saved-report JPEG evidence with strict entropy validation and explicit resolution and memory limits before rendering.

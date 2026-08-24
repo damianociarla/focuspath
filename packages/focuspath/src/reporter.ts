@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
-import { decode as decodeJpeg } from "jpeg-js";
+import jpegTurbo from "@julusian/jpeg-turbo";
+import { jpegDimensions } from "./jpeg.js";
 import type { FocusReport } from "./types.js";
 
 export function generateHtmlReport(report: FocusReport): string {
@@ -133,7 +134,7 @@ const SEVERITIES = new Set(["error", "warning"]);
 const EVIDENCE_STATUSES = new Set(["plotted", "partially-visible", "outside-capture", "sequence-only"]);
 const EVIDENCE_REASONS = new Set(["scroll-or-clipping-context", "geometry-unavailable"]);
 const MAX_RENDER_COORDINATE = 1_000_000;
-const MAX_IMAGE_PIXELS = 160_000_000;
+const MAX_IMAGE_PIXELS = 40_000_000;
 const MAX_REPORT_STEPS = 10_000;
 const MAX_REPORT_ISSUES = 20_000;
 const MAX_SCROLL_CONTEXTS = 128;
@@ -342,15 +343,17 @@ function decodeRasterDataUrl(value: string): { width: number; height: number } {
   if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes.at(-2) !== 0xff || bytes.at(-1) !== 0xd9) invalid("screenshot JPEG must have exact start and end markers without trailing data.");
 
   try {
-    const decoded = decodeJpeg(bytes, {
-      useTArray: true,
-      formatAsRGBA: false,
-      tolerantDecoding: false,
-      maxResolutionInMP: MAX_IMAGE_PIXELS / 1_000_000,
-      maxMemoryUsageInMB: 768,
-    });
-    if (decoded.width <= 0 || decoded.height <= 0 || decoded.width * decoded.height > MAX_IMAGE_PIXELS || decoded.data.byteLength !== decoded.width * decoded.height * 3) {
+    const dimensions = jpegDimensions(bytes);
+    if (!dimensions || dimensions.width <= 0 || dimensions.height <= 0) {
+      invalid("screenshot must be a fully decodable JPEG within the pixel budget.");
+    }
+    if (dimensions.width * dimensions.height > MAX_IMAGE_PIXELS) {
       invalid("screenshot JPEG decoded outside the supported pixel budget.");
+    }
+
+    const decoded = jpegTurbo.decompressSync(bytes, { format: jpegTurbo.FORMAT_RGB });
+    if (decoded.width !== dimensions.width || decoded.height !== dimensions.height || decoded.data.byteLength !== dimensions.width * dimensions.height * 3) {
+      invalid("screenshot JPEG decoded dimensions or pixels are inconsistent.");
     }
     return { width: decoded.width, height: decoded.height };
   } catch (error) {
