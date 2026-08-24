@@ -1,35 +1,49 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { ScanTimeoutError, scanFocusPath } from "focuspath";
 import { startPinnedEgressProxy } from "./egress-proxy.js";
 import { assertPublicUrl, canonicalHostname, createPublicUrlPolicy, parseHttpUrl, UnsafeUrlError } from "./network-policy.js";
 import { buildScanResponse, type ScanResponseFormat } from "./scan-response.js";
 import { clientAddress, consumeRateLimits, hasValidOriginToken, SlidingWindowLimiter } from "./security.js";
 
-const port = Number(process.env.PORT ?? 8787);
-const maxConcurrentScans = Number(process.env.MAX_CONCURRENT_SCANS ?? 2);
-const maxSteps = Number(process.env.MAX_FOCUS_STEPS ?? 50);
-const maxTabPresses = Number(process.env.MAX_TAB_PRESSES ?? maxSteps * 4);
-const maxOpaqueTabPresses = Number(process.env.MAX_OPAQUE_TAB_PRESSES ?? 100);
-const scanTimeoutMs = Number(process.env.SCAN_TIMEOUT_MS ?? 25_000);
-const engineVersion = (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version;
-const originVerifyToken = process.env.ORIGIN_VERIFY_TOKEN ?? "";
-const allowedOrigins = new Set((process.env.ALLOWED_ORIGINS ?? "http://localhost:5173,http://127.0.0.1:5173,https://damianociarla.github.io").split(",").map((origin) => origin.trim()).filter(Boolean));
-const rateWindowMs = 10 * 60_000;
-const rateMax = Number(process.env.RATE_LIMIT_PER_10_MINUTES ?? 4);
-const globalRateMax = Number(process.env.GLOBAL_RATE_LIMIT_PER_HOUR ?? 60);
-const targetRateMax = Number(process.env.TARGET_RATE_LIMIT_PER_HOUR ?? 2);
-const preflightRateMax = Number(process.env.PREFLIGHT_RATE_LIMIT_PER_MINUTE ?? Math.max(12, rateMax * 3));
-const preflightGlobalRateMax = Number(process.env.PREFLIGHT_GLOBAL_RATE_LIMIT_PER_MINUTE ?? Math.max(120, globalRateMax * 2));
-const preflightClientLimiter = new SlidingWindowLimiter(preflightRateMax, 60_000);
-const preflightGlobalLimiter = new SlidingWindowLimiter(preflightGlobalRateMax, 60_000, 1);
-const clientLimiter = new SlidingWindowLimiter(rateMax, rateWindowMs);
-const globalLimiter = new SlidingWindowLimiter(globalRateMax, 60 * 60_000, 1);
-const targetLimiter = new SlidingWindowLimiter(targetRateMax, 60 * 60_000);
-let activeScans = 0;
-const egressProxy = await startPinnedEgressProxy();
+export interface FocusPathServerOptions {
+  env?: NodeJS.ProcessEnv;
+  engineVersion?: string;
+  proxyServer?: string;
+  scan?: typeof scanFocusPath;
+  resolveSubmittedUrl?: typeof assertPublicUrl;
+  logUnexpectedError?: (error: unknown) => void;
+}
 
-const server = createServer(async (request, response) => {
+export function createFocusPathServer(options: FocusPathServerOptions = {}): Server {
+  const environment = options.env ?? process.env;
+  const maxConcurrentScans = Number(environment.MAX_CONCURRENT_SCANS ?? 2);
+  const maxSteps = Number(environment.MAX_FOCUS_STEPS ?? 50);
+  const maxTabPresses = Number(environment.MAX_TAB_PRESSES ?? maxSteps * 4);
+  const maxOpaqueTabPresses = Number(environment.MAX_OPAQUE_TAB_PRESSES ?? 100);
+  const scanTimeoutMs = Number(environment.SCAN_TIMEOUT_MS ?? 25_000);
+  const engineVersion = options.engineVersion ?? (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version;
+  const originVerifyToken = environment.ORIGIN_VERIFY_TOKEN ?? "";
+  const allowedOrigins = new Set((environment.ALLOWED_ORIGINS ?? "http://localhost:5173,http://127.0.0.1:5173,https://damianociarla.github.io").split(",").map((origin) => origin.trim()).filter(Boolean));
+  const rateWindowMs = 10 * 60_000;
+  const rateMax = Number(environment.RATE_LIMIT_PER_10_MINUTES ?? 4);
+  const globalRateMax = Number(environment.GLOBAL_RATE_LIMIT_PER_HOUR ?? 60);
+  const targetRateMax = Number(environment.TARGET_RATE_LIMIT_PER_HOUR ?? 2);
+  const preflightRateMax = Number(environment.PREFLIGHT_RATE_LIMIT_PER_MINUTE ?? Math.max(12, rateMax * 3));
+  const preflightGlobalRateMax = Number(environment.PREFLIGHT_GLOBAL_RATE_LIMIT_PER_MINUTE ?? Math.max(120, globalRateMax * 2));
+  const preflightClientLimiter = new SlidingWindowLimiter(preflightRateMax, 60_000);
+  const preflightGlobalLimiter = new SlidingWindowLimiter(preflightGlobalRateMax, 60_000, 1);
+  const clientLimiter = new SlidingWindowLimiter(rateMax, rateWindowMs);
+  const globalLimiter = new SlidingWindowLimiter(globalRateMax, 60 * 60_000, 1);
+  const targetLimiter = new SlidingWindowLimiter(targetRateMax, 60 * 60_000);
+  const scan = options.scan ?? scanFocusPath;
+  const resolveSubmittedUrl = options.resolveSubmittedUrl ?? assertPublicUrl;
+  const logUnexpectedError = options.logUnexpectedError ?? console.error;
+  let activeScans = 0;
+
+  const server = createServer(async (request, response) => {
   const origin = request.headers.origin;
   if (origin && allowedOrigins.has(origin)) {
     response.setHeader("access-control-allow-origin", origin);
@@ -89,7 +103,7 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    const url = await assertPublicUrl(submitted);
+    const url = await resolveSubmittedUrl(submitted);
     acquiredScanSlot = tryAcquireScanSlot();
     if (!acquiredScanSlot) {
       response.setHeader("retry-after", "15");
@@ -113,7 +127,7 @@ const server = createServer(async (request, response) => {
       return;
     }
 
-    const report = await scanFocusPath(url.toString(), {
+    const scanOptions: Parameters<typeof scanFocusPath>[1] = {
       headless: true,
       direction: "forward",
       maxSteps,
@@ -122,11 +136,12 @@ const server = createServer(async (request, response) => {
       timeoutMs: scanTimeoutMs,
       viewport: { width: 1280, height: 800 },
       isUrlAllowed: createPublicUrlPolicy(),
-      proxyServer: egressProxy.url,
       maxRequests: 120,
       blockedResourceTypes: ["font", "media"],
       maxScreenshotHeight: 5_000,
-    });
+    };
+    if (options.proxyServer) scanOptions.proxyServer = options.proxyServer;
+    const report = await scan(url.toString(), scanOptions);
 
     json(response, 200, buildScanResponse(report, engineVersion, responseFormat as ScanResponseFormat));
   } catch (error) {
@@ -134,15 +149,22 @@ const server = createServer(async (request, response) => {
     else if (error instanceof SyntaxError) json(response, 400, { error: "Invalid JSON request." });
     else if (error instanceof ScanTimeoutError) json(response, 504, { error: "The scan reached its time limit. Try a smaller or faster page." });
     else {
-      console.error(error);
+      logUnexpectedError(error);
       json(response, 502, { error: "The page could not be scanned. It may block automated browsers or take too long to load." });
     }
   } finally {
     if (acquiredScanSlot) activeScans = Math.max(0, activeScans - 1);
   }
-});
+  });
 
-server.listen(port, "0.0.0.0", () => console.log(`FocusPath API listening on :${port}`));
+  return server;
+
+  function tryAcquireScanSlot(): boolean {
+    if (activeScans >= maxConcurrentScans) return false;
+    activeScans += 1;
+    return true;
+  }
+}
 
 function json(response: ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body);
@@ -153,12 +175,6 @@ function json(response: ServerResponse, status: number, body: unknown): void {
     "x-content-type-options": "nosniff",
     "content-security-policy": "default-src 'none'; frame-ancestors 'none'",
   }).end(payload);
-}
-
-function tryAcquireScanSlot(): boolean {
-  if (activeScans >= maxConcurrentScans) return false;
-  activeScans += 1;
-  return true;
 }
 
 async function readJsonBody(request: IncomingMessage): Promise<Record<string, unknown>> {
@@ -175,4 +191,11 @@ async function readJsonBody(request: IncomingMessage): Promise<Record<string, un
     throw new UnsafeUrlError("Request body must be a JSON object.");
   }
   return body as Record<string, unknown>;
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const port = Number(process.env.PORT ?? 8787);
+  const egressProxy = await startPinnedEgressProxy();
+  const server = createFocusPathServer({ proxyServer: egressProxy.url });
+  server.listen(port, "0.0.0.0", () => console.log(`FocusPath API listening on :${port}`));
 }

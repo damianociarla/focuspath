@@ -28,6 +28,7 @@ before(async () => {
       ".js": "text/javascript",
       ".png": "image/png",
       ".svg": "image/svg+xml",
+      ".woff2": "font/woff2",
     }[extname(file)] ?? "application/octet-stream";
     response.writeHead(200, { "content-type": contentType });
     createReadStream(file).pipe(response);
@@ -44,6 +45,27 @@ after(async () => {
 });
 
 describe("documentation responsive layout", () => {
+  it("loads the bundled fonts without third-party requests", async () => {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    const requests = [];
+    page.on("request", (request) => requests.push(request.url()));
+    await page.goto(`${origin}/index.html`, { waitUntil: "networkidle" });
+    const fonts = await page.evaluate(async () => {
+      await document.fonts.ready;
+      return {
+        manrope: document.fonts.check('400 16px "Manrope"'),
+        dmMono400: document.fonts.check('400 16px "DM Mono"'),
+        dmMono500: document.fonts.check('500 16px "DM Mono"'),
+      };
+    });
+    assert.deepEqual(fonts, { manrope: true, dmMono400: true, dmMono500: true });
+    assert.ok(requests.every((url) => url.startsWith(origin)), `unexpected third-party request: ${requests.find((url) => !url.startsWith(origin))}`);
+    for (const font of ["manrope-latin-wght-normal", "dm-mono-latin-400-normal", "dm-mono-latin-500-normal"]) {
+      assert.ok(requests.some((url) => url.endsWith(`${font}.woff2`)), `${font} was not loaded`);
+    }
+    await page.close();
+  });
+
   it("keeps the primary hero action usable in a compact first viewport", async () => {
     const page = await browser.newPage({ viewport: { width: 375, height: 667 } });
     await page.goto(`${origin}/index.html`, { waitUntil: "networkidle" });
