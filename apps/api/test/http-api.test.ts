@@ -21,8 +21,8 @@ describe("HTTP API", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
     const body = await response.json();
-    expect(body).toEqual({ status: "ok", version: "0.7.0", activeScans: 0 });
-    expect(() => assertOpenApiResponse("/health", "get", response.status, body)).not.toThrow();
+    expect(body).toEqual({ status: "ok", version: "0.7.1", activeScans: 0 });
+    expect(() => assertOpenApiResponse("/health", "get", response.status, body, response.headers)).not.toThrow();
   });
 
   it("enforces JSON content type", async () => {
@@ -30,7 +30,7 @@ describe("HTTP API", () => {
     expect(response.status).toBe(415);
     const body = await response.json();
     expect(body).toEqual({ error: "Content-Type must be application/json." });
-    expect(() => assertOpenApiResponse("/v1/scans", "post", response.status, body)).not.toThrow();
+    expect(() => assertOpenApiResponse("/v1/scans", "post", response.status, body, response.headers)).not.toThrow();
   });
 
   it("rejects malformed and unexpected request bodies", async () => {
@@ -40,6 +40,8 @@ describe("HTTP API", () => {
       body: "{",
     });
     expect(malformed.status).toBe(400);
+    const malformedBody = await malformed.json();
+    expect(() => assertOpenApiResponse("/v1/scans", "post", malformed.status, malformedBody, malformed.headers)).not.toThrow();
 
     const nullBody = await fetch(`${baseUrl}/v1/scans`, {
       method: "POST",
@@ -47,7 +49,9 @@ describe("HTTP API", () => {
       body: "null",
     });
     expect(nullBody.status).toBe(400);
-    expect(await nullBody.json()).toEqual({ error: "Request body must be a JSON object." });
+    const nullResponseBody = await nullBody.json();
+    expect(nullResponseBody).toEqual({ error: "Request body must be a JSON object." });
+    expect(() => assertOpenApiResponse("/v1/scans", "post", nullBody.status, nullResponseBody, nullBody.headers)).not.toThrow();
 
     const extra = await fetch(`${baseUrl}/v1/scans`, {
       method: "POST",
@@ -55,7 +59,9 @@ describe("HTTP API", () => {
       body: JSON.stringify({ url: "https://example.com", extra: true }),
     });
     expect(extra.status).toBe(400);
-    expect(await extra.json()).toEqual({ error: "Request body must contain only a URL and optional response format." });
+    const extraBody = await extra.json();
+    expect(extraBody).toEqual({ error: "Request body must contain only a URL and optional response format." });
+    expect(() => assertOpenApiResponse("/v1/scans", "post", extra.status, extraBody, extra.headers)).not.toThrow();
 
     const invalidFormat = await fetch(`${baseUrl}/v1/scans`, {
       method: "POST",
@@ -63,7 +69,9 @@ describe("HTTP API", () => {
       body: JSON.stringify({ url: "https://example.com", format: "both" }),
     });
     expect(invalidFormat.status).toBe(400);
-    expect(await invalidFormat.json()).toEqual({ error: "Response format must be html or structured." });
+    const invalidFormatBody = await invalidFormat.json();
+    expect(invalidFormatBody).toEqual({ error: "Response format must be html or structured." });
+    expect(() => assertOpenApiResponse("/v1/scans", "post", invalidFormat.status, invalidFormatBody, invalidFormat.headers)).not.toThrow();
   });
 
   it("rejects unsafe targets over the real HTTP boundary", async () => {
@@ -73,7 +81,9 @@ describe("HTTP API", () => {
       body: JSON.stringify({ url: "http://127.0.0.1" }),
     });
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "The URL does not resolve to a public internet address." });
+    const body = await response.json();
+    expect(body).toEqual({ error: "The URL does not resolve to a public internet address." });
+    expect(() => assertOpenApiResponse("/v1/scans", "post", response.status, body, response.headers)).not.toThrow();
   });
 
   it("applies CORS only to allowed browser origins", async () => {
@@ -91,6 +101,15 @@ describe("HTTP API", () => {
     });
     expect(denied.status).toBe(403);
     expect(denied.headers.get("access-control-allow-origin")).toBeNull();
+
+    const deniedPost = await fetch(`${baseUrl}/v1/scans`, {
+      method: "POST",
+      headers: { origin: "https://attacker.example", "content-type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com" }),
+    });
+    const deniedBody = await deniedPost.json();
+    expect(deniedPost.status).toBe(403);
+    expect(() => assertOpenApiResponse("/v1/scans", "post", deniedPost.status, deniedBody, deniedPost.headers)).not.toThrow();
   });
 
   it("hides scan routes unless the private origin token is present", async () => {
@@ -116,15 +135,21 @@ describe("HTTP API", () => {
       const quota = await postScan(rateLimited.baseUrl, "https://example.com");
       expect(quota.status).toBe(429);
       expect(quota.headers.get("retry-after")).toBe("600");
+      const quotaBody = await quota.json();
+      expect(() => assertOpenApiResponse("/v1/scans", "post", quota.status, quotaBody, quota.headers)).not.toThrow();
 
       const preflight = await postScan(preflightLimited.baseUrl, "https://does-not-resolve.invalid");
       expect(preflight.status).toBe(429);
       expect(preflight.headers.get("retry-after")).toBe("60");
-      expect(await preflight.json()).toEqual({ error: "Too many URL validation attempts. Try again in a minute." });
+      const preflightBody = await preflight.json();
+      expect(preflightBody).toEqual({ error: "Too many URL validation attempts. Try again in a minute." });
+      expect(() => assertOpenApiResponse("/v1/scans", "post", preflight.status, preflightBody, preflight.headers)).not.toThrow();
 
       const capacity = await postScan(atCapacity.baseUrl, "https://example.com");
       expect(capacity.status).toBe(503);
       expect(capacity.headers.get("retry-after")).toBe("15");
+      const capacityBody = await capacity.json();
+      expect(() => assertOpenApiResponse("/v1/scans", "post", capacity.status, capacityBody, capacity.headers)).not.toThrow();
       const capacityRetry = await postScan(atCapacity.baseUrl, "https://example.com");
       expect(capacityRetry.status).toBe(503);
       expect(capacityRetry.headers.get("retry-after")).toBe("15");
@@ -159,10 +184,33 @@ describe("HTTP API", () => {
     try {
       const response = await postScan(isolated.baseUrl, "https://example.com");
       expect(response.status).toBe(504);
-      expect(await response.json()).toEqual({ error: "The scan reached its time limit. Try a smaller or faster page." });
+      const body = await response.json();
+      expect(body).toEqual({ error: "The scan reached its time limit. Try a smaller or faster page." });
+      expect(() => assertOpenApiResponse("/v1/scans", "post", response.status, body, response.headers)).not.toThrow();
     } finally {
       await stopApi(isolated.process);
     }
+  });
+
+  it("validates the documented scan failure response", () => {
+    const headers = new Headers({ "content-type": "application/json" });
+    expect(() => assertOpenApiResponse(
+      "/v1/scans",
+      "post",
+      502,
+      { error: "The page could not be scanned. It may block automated browsers or take too long to load." },
+      headers,
+    )).not.toThrow();
+  });
+
+  it("requires documented retry headers", () => {
+    expect(() => assertOpenApiResponse(
+      "/v1/scans",
+      "post",
+      429,
+      { error: "Try again later." },
+      new Headers({ "content-type": "application/json" }),
+    )).toThrow(/missing documented response header Retry-After/);
   });
 });
 
