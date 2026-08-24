@@ -10,6 +10,7 @@ const releaseWorkflow = await readFile(new URL(".github/workflows/release.yml", 
 const ciWorkflow = await readFile(new URL(".github/workflows/ci.yml", root), "utf8");
 const codeqlWorkflow = await readFile(new URL(".github/workflows/codeql.yml", root), "utf8");
 const dependabot = await readFile(new URL(".github/dependabot.yml", root), "utf8");
+const nativeReporterCheck = await readFile(new URL("scripts/check-native-reporter.mjs", root), "utf8");
 
 async function collectYamlFiles(directory, relativeDirectory) {
   const files = [];
@@ -97,7 +98,8 @@ for (const [name, workflow] of [["CI", ciWorkflow], ["release validation", relea
 for (const runner of ["ubuntu-latest", "windows-latest", "macos-14"]) {
   assert(ciWorkflow.includes(`os: ${runner}`), `Native compatibility CI must cover ${runner}.`);
 }
-assert.match(ciWorkflow, /native-smoke:[\s\S]*?npm run reporter:native/, "CI must exercise the native JPEG reporter on every matrix platform.");
+assert.match(ciWorkflow, /native-smoke:[\s\S]*?npm run reporter:native/, "CI must exercise the packed npm artifact on every matrix platform.");
+assert.match(nativeReporterCheck, /npm_execpath[\s\S]*?npm[\s\S]*?pack[\s\S]*?install[\s\S]*?focuspath\/reporter[\s\S]*?focuspath[\s\S]*?--version/, "Native compatibility must pack, install and exercise the exact consumer artifact.");
 assert.match(ciWorkflow, /native-compatibility:[\s\S]*?needs: native-smoke/, "CI must expose one stable native compatibility check for branch protection.");
 assert.match(ciWorkflow, /actions\/upload-artifact@[a-f0-9]{40}[\s\S]*?reporter-performance-\$\{\{ github\.sha \}\}/, "CI must preserve per-commit reporter performance measurements.");
 assert.match(ciWorkflow, /REPORTER_METRICS_PATH: artifacts\/reporter-performance\.json/, "CI must emit structured reporter performance history.");

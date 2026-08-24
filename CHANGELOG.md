@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.1
+
+- Validate every documented API error shape against OpenAPI, including retry response headers and the 502 scan-failure contract.
+- Pack and install the exact npm artifact in a clean project on Linux x64, Windows x64 and macOS ARM64 before exercising root imports, the reporter entry point and CLI version.
+- Keep the stable native compatibility gate and infrastructure guardrails tied to the stronger consumer-artifact smoke test.
+
 ## 0.7.0
 
 - Validate deterministic HTTP responses and both hosted scan response formats against the canonical OpenAPI 3.1 contract in CI.
