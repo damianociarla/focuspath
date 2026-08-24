@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { generateHtmlReport } from "../packages/focuspath/dist/reporter.js";
+import { MAX_REPORT_PIXELS } from "../packages/focuspath/dist/report-limits.js";
 
 const screenshot = readFileSync(process.argv[2]).toString("base64");
 const width = 1_440;
-const height = 20_000;
+const height = Math.floor(MAX_REPORT_PIXELS / width);
 const report = {
   version: 4,
   direction: "forward",

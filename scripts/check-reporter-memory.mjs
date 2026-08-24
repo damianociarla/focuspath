@@ -5,9 +5,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { MAX_REPORT_PIXELS } from "../packages/focuspath/dist/report-limits.js";
 
 const width = 1_440;
-const height = 20_000;
+const height = Math.floor(MAX_REPORT_PIXELS / width);
 const maxRssMiB = 384;
 const directory = mkdtempSync(join(tmpdir(), "focuspath-reporter-memory-"));
 const screenshotPath = join(directory, "tall-page.jpg");

@@ -81,6 +81,10 @@ const html = generateHtmlReport(result);
 
 `generateHtmlReport` validates saved reports at runtime before rendering them, including schema enums, finite geometry, limits, findings, and screenshot evidence. It accepts only the JPEG format emitted by FocusPath, fully decodes it with native libjpeg-turbo under fixed byte and pixel budgets, and verifies the decoded dimensions. The dedicated `focuspath/reporter` entry point avoids loading Playwright for report-only consumers; the root export remains available for compatibility. Invalid or tampered JSON throws a `TypeError` instead of producing a report.
 
+FocusPath is intentionally ESM-only on Node.js 24+: use `import` or dynamic `import()`, not CommonJS `require()`.
+
+Scanner and reporter share a hard 40-megapixel evidence budget. A larger `maxScreenshotHeight`, including `Infinity`, is reduced according to the actual capture width; `capture.truncated` records the cutoff and the source dimensions remain available in `capture`.
+
 ## Development
 
 Requirements: Node.js 24+. This is an intentional project baseline so the CLI, CI, Playwright container, and release workflow use the same runtime; broader compatibility can be considered once it has its own tested matrix.

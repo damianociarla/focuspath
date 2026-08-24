@@ -5,12 +5,16 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const server = createServer((_request, response) => {
+const server = createServer((request, response) => {
   response.setHeader("content-type", "text/html; charset=utf-8");
-  response.end("<!doctype html><title>Dev smoke test</title><button>Ready</button>");
+  const tall = request.url === "/tall";
+  response.end(tall
+    ? "<!doctype html><style>html,body{margin:0}.tall{height:30000px;background:linear-gradient(#102030,#dcefff)}</style><title>Tall dev smoke test</title><button style=position:fixed>Ready</button><div class=tall></div>"
+    : "<!doctype html><title>Dev smoke test</title><button>Ready</button>");
 });
 const directory = await mkdtemp(join(tmpdir(), "focuspath-dev-"));
 const reportPath = join(directory, "report.html");
+const tallReportPath = join(directory, "tall-report.html");
 
 try {
   const versionResult = await run("npm", ["run", "dev", "--", "--version"]);
@@ -36,6 +40,22 @@ try {
   assert.equal(result.code, 0, `Development CLI failed:\n${result.stderr}\n${result.stdout}`);
   assert.match(result.stdout, /1 forward focus stops/);
   assert.match(await readFile(reportPath, "utf8"), /FocusPath \/ Report/);
+
+  const tallResult = await run("npm", [
+    "run",
+    "dev",
+    "--",
+    `http://127.0.0.1:${address.port}/tall`,
+    "--output",
+    tallReportPath,
+    "--max-screenshot-height",
+    "30000",
+    "--max-steps",
+    "1",
+  ]);
+  assert.equal(tallResult.code, 0, `Tall development CLI failed:\n${tallResult.stderr}\n${tallResult.stdout}`);
+  assert.match(tallResult.stdout, /Screenshot truncated to 1440×27777px from 1440×30000px/);
+  assert.match(await readFile(tallReportPath, "utf8"), /FocusPath \/ Report/);
   console.log("Development CLI smoke test passed");
 } finally {
   await new Promise((resolve) => server.close(() => resolve()));

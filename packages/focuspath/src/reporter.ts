@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer";
 import jpegTurbo from "@julusian/jpeg-turbo";
 import { jpegDimensions } from "./jpeg.js";
+import { MAX_REPORT_PIXELS } from "./report-limits.js";
 import type { FocusReport } from "./types.js";
 
 export function generateHtmlReport(report: FocusReport): string {
@@ -134,7 +135,6 @@ const SEVERITIES = new Set(["error", "warning"]);
 const EVIDENCE_STATUSES = new Set(["plotted", "partially-visible", "outside-capture", "sequence-only"]);
 const EVIDENCE_REASONS = new Set(["scroll-or-clipping-context", "geometry-unavailable"]);
 const MAX_RENDER_COORDINATE = 1_000_000;
-const MAX_IMAGE_PIXELS = 40_000_000;
 const MAX_REPORT_STEPS = 10_000;
 const MAX_REPORT_ISSUES = 20_000;
 const MAX_SCROLL_CONTEXTS = 128;
@@ -261,7 +261,7 @@ function dimensions(value: unknown, path: string): void {
   const size = record(value, path);
   positiveRenderInteger(size.width, `${path}.width`);
   positiveRenderInteger(size.height, `${path}.height`);
-  if ((size.width as number) * (size.height as number) > MAX_IMAGE_PIXELS) invalid(`${path} exceeds the supported pixel budget.`);
+  if ((size.width as number) * (size.height as number) > MAX_REPORT_PIXELS) invalid(`${path} exceeds the supported pixel budget.`);
 }
 
 function record(value: unknown, path: string): Record<string, unknown> {
@@ -347,7 +347,7 @@ function decodeRasterDataUrl(value: string): { width: number; height: number } {
     if (!dimensions || dimensions.width <= 0 || dimensions.height <= 0) {
       invalid("screenshot must be a fully decodable JPEG within the pixel budget.");
     }
-    if (dimensions.width * dimensions.height > MAX_IMAGE_PIXELS) {
+    if (dimensions.width * dimensions.height > MAX_REPORT_PIXELS) {
       invalid("screenshot JPEG decoded outside the supported pixel budget.");
     }
 

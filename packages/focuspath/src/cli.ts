@@ -17,8 +17,8 @@ Options:
   --max-tab-presses <n>    Maximum total Tab presses (default: 4 × max-steps)
   --max-opaque-tab-presses <n> Repeated Tab limit per opaque host (default: 100)
   --max-requests <number>  Maximum page requests (default: 500; max: 10000)
-  --max-screenshot-height <px> Screenshot height budget (default: 20000; max: 100000)
-  --unlimited              Explicitly remove request and screenshot-height limits
+  --max-screenshot-height <px> Requested height (default: 20000; max: 100000; 40 MP hard cap)
+  --unlimited              Remove request/requested-height limits; the 40 MP safety cap remains
   --direction <forward|reverse> Keyboard traversal direction (default: forward)
   --viewport <width>x<height> (default: 1440x900)
   --headed                 Show the browser while scanning
@@ -60,6 +60,9 @@ async function main(): Promise<void> {
   const errors = report.issues.filter((issue) => issue.severity === "error").length;
   const warnings = report.issues.filter((issue) => issue.severity === "warning").length;
   console.log(`✓ ${report.steps.length} ${report.direction} focus stops · ${report.tabPressCount} Tab presses · ${errors} errors · ${warnings} warnings`);
+  if (report.capture?.truncated) {
+    console.log(`Screenshot truncated to ${report.document.width}×${report.document.height}px from ${report.capture.sourceWidth}×${report.capture.sourceHeight}px.`);
+  }
   console.log(`Report: ${output}`);
   if (errors > 0) process.exitCode = 1;
 }

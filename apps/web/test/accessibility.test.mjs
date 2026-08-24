@@ -58,6 +58,9 @@ describe("website accessibility contract", () => {
     assert.match(docs, /blocks font and media requests/);
     assert.match(docs, /Embedded URL credentials are rejected/);
     assert.match(docs, /Query strings, screenshots, accessible names and rendered report content may contain sensitive data/);
+    assert.match(docs, /ESM-only public API/);
+    assert.match(docs, /same 40 MP evidence budget/);
+    assert.match(docs, /does not bypass the 40 MP report safety cap/);
     assert.match(docs, /import \{ scanFocusPath \} from "focuspath"/);
     assert.match(docs, /import \{ generateHtmlReport \} from "focuspath\/reporter"/);
     assert.match(docs, /const html = generateHtmlReport\(report\)/);

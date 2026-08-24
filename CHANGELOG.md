@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.9
+
+- Share one 40-megapixel safety budget between Chromium capture and report rendering so every scanner result remains renderable.
+- Clamp requested and unlimited screenshot heights using the actual capture width, preserving full source dimensions and marking `capture.truncated`.
+- Cover 1440×30,000, 4000×11,000 and unlimited scans end to end, and move the memory gate to a near-limit 1440×27,777 capture.
+- Report screenshot truncation in the CLI and document the package's intentional ESM-only contract.
+
 ## 0.6.8
 
 - Replace the full-frame JavaScript JPEG decoder with synchronous native libjpeg-turbo validation, reducing a 1440×20,000 report from roughly 794 MiB to about 133 MiB peak RSS locally while rejecting truncated entropy streams.
