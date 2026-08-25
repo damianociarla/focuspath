@@ -1,7 +1,7 @@
 {
-  "name": "FocusPath — Visual keyboard accessibility scanner",
+  "name": "FocusPath — Turn keyboard testing into evidence",
   "short_name": "FocusPath",
-  "description": "Visualize keyboard focus order and uncover accessibility issues.",
+  "description": "Record the Tab journey as repeatable, shareable, and comparable visual evidence.",
   "start_url": "/focuspath/",
   "scope": "/focuspath/",
   "display": "standalone",

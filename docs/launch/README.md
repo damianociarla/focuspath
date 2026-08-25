@@ -6,7 +6,11 @@ international frontend, testing, open-source, and accessibility communities.
 
 ## Positioning
 
-**Primary promise:** Make the keyboard route visible.
+**Primary promise:** Turn the Tab journey into evidence.
+
+**Positioning:** FocusPath does not replace manual keyboard testing. It records
+the Tab journey and turns it into repeatable, shareable, and comparable
+evidence.
 
 **One-sentence description:** FocusPath follows real `Tab` or `Shift+Tab`
 navigation in Chromium and turns the observed focus route into a portable

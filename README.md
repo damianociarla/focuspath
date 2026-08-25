@@ -2,13 +2,15 @@
 
 **See where keyboard navigation breaks.**
 
-FocusPath traverses a web page with Chromium, records the keyboard focus stops it reaches, flags deterministic accessibility problems, and generates a portable visual report.
+FocusPath records the Tab or Shift+Tab journey in Chromium, preserves the keyboard focus stops it reaches, flags deterministic accessibility problems, and generates a portable visual report.
 
 ```bash
 npx focuspath https://example.com
 ```
 
-> FocusPath is an early open-source release. It complements—not replaces—manual accessibility testing and established rule engines.
+> **FocusPath does not replace manual keyboard testing.** It records the Tab journey and turns it into repeatable, shareable, and comparable evidence.
+
+Repeat a scan under the same conditions to investigate a regression, share the self-contained report with a teammate, or compare reports across builds. FocusPath does not perform an automatic diff yet; human judgment remains essential for usability, interaction context, focus appearance, browser and assistive-technology differences, and WCAG conformance.
 
 ## What it reports
 

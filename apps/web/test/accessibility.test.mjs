@@ -62,6 +62,16 @@ describe("website accessibility contract", () => {
     assert.match(html, /data-result-engine/);
   });
 
+  it("positions reports as evidence that complements manual keyboard testing", () => {
+    for (const source of [html, docs]) {
+      assert.match(source, /does not replace manual keyboard testing/i);
+      assert.match(source, /repeat(?:able|ed| a scan)/i);
+      assert.match(source, /share(?:able| the)/i);
+      assert.match(source, /compar(?:able|e reports)/i);
+    }
+    assert.match(docs, /FocusPath does not perform an automatic diff yet/);
+  });
+
   it("documents traversal budgets, API metadata and opaque boundaries", () => {
     assert.match(docs, /--max-tab-presses/);
     assert.match(docs, /--direction/);
