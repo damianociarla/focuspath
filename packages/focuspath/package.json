@@ -57,7 +57,7 @@
     "@types/node": "^24.3.0",
     "jpeg-js": "0.4.4",
     "tsup": "^8.5.0",
-    "typescript": "^5.9.2",
+    "typescript": "^7.0.2",
     "vitest": "^3.2.4"
   },
   "engines": {
