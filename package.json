@@ -23,9 +23,9 @@
     "@eslint/js": "10.0.1",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
-    "eslint": "10.9.0",
+    "eslint": "10.9.1",
     "globals": "17.11.0",
-    "typescript-eslint": "8.67.0",
+    "typescript-eslint": "8.68.0",
     "yaml": "2.9.0"
   },
   "engines": {
